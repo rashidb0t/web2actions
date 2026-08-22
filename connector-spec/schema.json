@@ -1,0 +1,241 @@
+{
+  "title": "ConnectorDefinition",
+  "description": "Defines a single generated connector",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "The unique name of the connector.",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "version": {
+      "description": "The version of the connector definition.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "description": "A brief description of what the connector does.",
+      "type": "string",
+      "minLength": 1
+    },
+    "websiteUrl": {
+      "description": "URL of the website this connector is for.",
+      "type": "string",
+      "format": "uri"
+    },
+    "logoUrl": {
+      "description": "URL of the website's logo, for display.",
+      "type": "string",
+      "format": "uri"
+    },
+    "auth": {
+      "description": "Authentication method required.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Type of authentication.",
+          "type": "string",
+          "enum": [
+            "none",
+            "apiKey",
+            "oauth",
+            "basic"
+          ]
+        },
+        "apiKeyIn": {
+          "description": "Where the API key is placed.",
+          "type": "string",
+          "enum": [
+            "header",
+            "query"
+          ]
+        },
+        "apiKeyName": {
+          "description": "Name of the API key header or query parameter.",
+          "type": "string"
+        },
+        "oauth2": {
+          "description": "OAuth2 configuration.",
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "type": "string"
+            },
+            "clientSecret": {
+              "type": "string"
+            },
+            "tokenEndpoint": {
+              "type": "string",
+              "format": "uri"
+            },
+            "authorizationEndpoint": {
+              "type": "string",
+              "format": "uri"
+            },
+            "scope": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "clientId",
+            "tokenEndpoint",
+            "authorizationEndpoint",
+            "scope"
+          ]
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "tools": {
+      "description": "A list of actions the connector can perform.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Unique name for the tool (e.g., searchCustomers).",
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "description": {
+            "description": "A clear, human-readable description of what the tool does.",
+            "type": "string",
+            "minLength": 1
+          },
+          "risk": {
+            "description": "The risk associated with the tool.",
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "destructive"
+            ]
+          },
+          "inputSchema": {
+            "description": "Schema defining the tool's input parameters.",
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "object"
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "description"
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "properties"
+              ]
+            },
+            "required": [
+              "type",
+              "properties"
+            ]
+          },
+          "outputSchema": {
+            "description": "Schema defining the tool's output structure.",
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "object"
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "description"
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "properties"
+              ]
+            },
+            "required": [
+              "type",
+              "properties"
+            ]
+          },
+          "call": {
+            "description": "Details on how to invoke the tool.",
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "DELETE",
+                  "PATCH"
+                ]
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "headers": {
+                "description": "HTTP headers to send.",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "body": {
+                "description": "Request body structure, if applicable.",
+                "type": "object"
+              }
+            },
+            "required": [
+              "method",
+              "url"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "risk",
+          "inputSchema",
+          "outputSchema",
+          "call"
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "description",
+    "websiteUrl",
+    "auth",
+    "tools"
+  ]
+}

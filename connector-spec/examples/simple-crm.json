@@ -1,0 +1,93 @@
+{
+  "name": "simple-crm",
+  "version": "1.0.0",
+  "description": "Connector for managing contacts and invoices in a lightweight CRM system",
+  "websiteUrl": "https://app.simplecrm.example.com",
+  "logoUrl": "https://app.simplecrm.example.com/logo.svg",
+  "auth": {
+    "type": "apiKey",
+    "apiKeyIn": "header",
+    "apiKeyName": "X-CRM-API-Key"
+  },
+  "tools": [
+    {
+      "name": "listContacts",
+      "description": "Fetch a list of contacts with optional email search filter",
+      "risk": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address substring to filter by"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of contacts to return"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "call": {
+        "method": "GET",
+        "url": "https://app.simplecrm.example.com/api/v1/contacts"
+      }
+    },
+    {
+      "name": "createContact",
+      "description": "Create a new contact with name, email, and phone number",
+      "risk": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name of the contact"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the contact"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone number of the contact"
+          }
+        },
+        "required": ["name", "email"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "call": {
+        "method": "POST",
+        "url": "https://app.simplecrm.example.com/api/v1/contacts",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "name": "{{input.name}}",
+          "email": "{{input.email}}",
+          "phone": "{{input.phone}}"
+        }
+      }
+    }
+  ]
+}

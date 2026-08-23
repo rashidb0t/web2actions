@@ -1,0 +1,82 @@
+{
+  "name": "oauth-payments",
+  "version": "2.1.0",
+  "description": "Payment gateway connector with OAuth2 authentication and destructive refund/cancellation tools",
+  "websiteUrl": "https://dashboard.paygateway.example.com",
+  "auth": {
+    "type": "oauth",
+    "oauth2": {
+      "clientId": "paygateway_client_app",
+      "clientSecret": "{{env.PAYGATEWAY_CLIENT_SECRET}}",
+      "authorizationEndpoint": "https://auth.paygateway.example.com/oauth/authorize",
+      "tokenEndpoint": "https://auth.paygateway.example.com/oauth/token",
+      "scope": "payments.read payments.write invoices.cancel"
+    }
+  },
+  "tools": [
+    {
+      "name": "getPaymentDetails",
+      "description": "Retrieve detailed transaction data for a given payment ID",
+      "risk": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "description": "Unique transaction ID"
+          }
+        },
+        "required": ["paymentId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "amount": {"type": "number"},
+          "currency": {"type": "string"},
+          "status": {"type": "string"}
+        }
+      },
+      "call": {
+        "method": "GET",
+        "url": "https://api.paygateway.example.com/v2/payments/{{input.paymentId}}"
+      }
+    },
+    {
+      "name": "cancelInvoice",
+      "description": "Permanently cancel and void an unpaid invoice",
+      "risk": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "description": "ID of the invoice to void"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for invoice cancellation"
+          }
+        },
+        "required": ["invoiceId", "reason"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cancelled": {"type": "boolean"},
+          "voidedAt": {"type": "string"}
+        }
+      },
+      "call": {
+        "method": "DELETE",
+        "url": "https://api.paygateway.example.com/v2/invoices/{{input.invoiceId}}",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "reason": "{{input.reason}}"
+        }
+      }
+    }
+  ]
+}

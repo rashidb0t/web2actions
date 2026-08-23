@@ -1,0 +1,80 @@
+{
+  "name": "public-docs",
+  "version": "1.2.0",
+  "description": "Public documentation search and article lookup connector requiring no authentication",
+  "websiteUrl": "https://docs.openframework.example.com",
+  "auth": {
+    "type": "none"
+  },
+  "tools": [
+    {
+      "name": "searchArticles",
+      "description": "Search public knowledge base articles by query text and tags",
+      "risk": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query keywords"
+          },
+          "tag": {
+            "type": "string",
+            "description": "Category or topic tag filter"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number for pagination (starts at 1)"
+          }
+        },
+        "required": ["query"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      },
+      "call": {
+        "method": "GET",
+        "url": "https://docs.openframework.example.com/api/v1/search"
+      }
+    },
+    {
+      "name": "getArticleById",
+      "description": "Retrieve full markdown content for a specific article ID",
+      "risk": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "type": "string",
+            "description": "Unique identifier of the article"
+          }
+        },
+        "required": ["articleId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string"},
+          "content": {"type": "string"},
+          "lastUpdated": {"type": "string"}
+        }
+      },
+      "call": {
+        "method": "GET",
+        "url": "https://docs.openframework.example.com/api/v1/articles/{{input.articleId}}"
+      }
+    }
+  ]
+}

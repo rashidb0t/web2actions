@@ -8,7 +8,7 @@ import os
 import sys
 import unittest
 
-SPEC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "packages", "connector-spec"))
+SPEC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if SPEC_DIR not in sys.path:
     sys.path.insert(0, SPEC_DIR)
 

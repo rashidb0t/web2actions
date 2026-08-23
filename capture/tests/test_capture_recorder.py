@@ -9,8 +9,7 @@ import sys
 import threading
 import unittest
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-CAPTURE_PKG_DIR = os.path.join(PROJECT_ROOT, "packages", "capture")
+CAPTURE_PKG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if CAPTURE_PKG_DIR not in sys.path:
     sys.path.insert(0, CAPTURE_PKG_DIR)
 

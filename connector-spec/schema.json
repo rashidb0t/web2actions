@@ -114,74 +114,32 @@
             ]
           },
           "inputSchema": {
-            "description": "Schema defining the tool's input parameters.",
+            "description": "JSON Schema for the tool's input parameters.",
             "type": "object",
             "properties": {
               "type": {
-                "const": "object"
+                "type": "string",
+                "enum": [
+                  "object"
+                ]
               },
               "properties": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "description"
-                  ]
-                }
+                "type": "object"
               },
-              "required": [
-                "type",
-                "properties"
-              ]
+              "required": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             },
             "required": [
-              "type",
-              "properties"
+              "type"
             ]
           },
           "outputSchema": {
-            "description": "Schema defining the tool's output structure.",
-            "type": "object",
-            "properties": {
-              "type": {
-                "const": "object"
-              },
-              "properties": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "description"
-                  ]
-                }
-              },
-              "required": [
-                "type",
-                "properties"
-              ]
-            },
-            "required": [
-              "type",
-              "properties"
-            ]
+            "description": "JSON Schema for the tool's output structure.",
+            "type": "object"
           },
           "call": {
             "description": "Details on how to invoke the tool.",
@@ -237,5 +195,6 @@
     "websiteUrl",
     "auth",
     "tools"
-  ]
+  ],
+  "": "https://json-schema.org/draft/2020-12/schema"
 }

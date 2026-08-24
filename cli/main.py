@@ -87,7 +87,15 @@ def cmd_capture(args: argparse.Namespace) -> int:
     from recorder import NetworkRecorder
 
     session = BrowserSession(headless=False)
-    page = session.start()
+    try:
+        page = session.start()
+    except Exception as exc:  # noqa: BLE001 - Playwright browser-not-installed is common
+        if "Executable doesn't exist" in str(exc) or "playwright install" in str(exc):
+            print("The Playwright browser is not installed.")
+            print("Run: playwright install chromium")
+            return 1
+        print(f"Failed to launch browser: {exc}")
+        return 1
     recorder = NetworkRecorder()
     recorder.start(page)
     page.goto(url, wait_until="domcontentloaded")

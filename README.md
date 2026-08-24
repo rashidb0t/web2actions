@@ -25,6 +25,7 @@ No public API required.
 
 ```bash
 pip install -e .
+playwright install chromium     # downloads the browser used by `capture`
 ```
 
 ## Commands

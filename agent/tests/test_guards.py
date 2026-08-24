@@ -39,7 +39,7 @@ class TestGuards(unittest.TestCase):
         self.assertIn("CAPTCHA", verdict["reasons"][0])
 
     def test_bot_body_blocks(self):
-        entries = [{"url": "https://site.com/", "method": "GET",
+        entries = [{"url": "https://site.com/", "method": "GET", "resource_type": "document",
                     "response_body": "Just a moment... verifying you are human"}]
         verdict = detect_challenges(entries)
         self.assertTrue(verdict["blocked"])

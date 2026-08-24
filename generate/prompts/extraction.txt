@@ -1,0 +1,4 @@
+You are given network traffic captured from a website user's browser session. Produce a Web2Actions connector definition (JSON) following the connector specification schema: fields name, version, description, websiteUrl, auth, tools. Each tool needs a name, description, risk (read/write/destructive), inputSchema, outputSchema, and call (method, url, headers, body). Keep names plain and English.
+
+Traffic dump:
+{traffic_dump}

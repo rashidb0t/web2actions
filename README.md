@@ -41,6 +41,22 @@ web2actions model --alias sonnet=anthropic/claude-sonnet-4  # alias
 web2actions model --aliases             # list aliases
 ```
 
+### `analyze` — discover a site's API surface (agent harness)
+
+Runs the agent over captured traffic and lists the meaningful API endpoints
+(using your configured LLM — any provider via litellm). It reverse-engineers
+**almost any** backend — a custom REST API, GraphQL, SDK/RPC protocols,
+form-based server actions, or a backend on a completely different domain
+(like Supabase) — by analyzing the real traffic rather than assuming a shape:
+
+```bash
+web2actions capture https://app.example.com          # produces traffic.json
+web2actions analyze traffic.json
+```
+
+You can pick a model with `--model`, or it uses your saved `web2actions model`
+choice.
+
 ### `capture` — record a site's traffic
 
 Opens a browser to the URL, records the network traffic you generate as you
@@ -174,6 +190,7 @@ with a raw stack trace.
 - `generate/` — LLM extraction (cheap path) + sandboxed fallback
 - `validate/` — live tool smoke tests + risk tagging
 - `mcp-runtime/` — the shared MCP server that serves any connector
+- `agent/` — the agent harness (vendored CLI-Anything-Web) + provider-agnostic LLM backend
 - `cli/` — the `web2actions` command-line wrapper
 
 ## License

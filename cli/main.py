@@ -118,8 +118,8 @@ def cmd_capture(args: argparse.Namespace) -> int:
     entries = recorder.get_entries()
     if args.filter and url != "about:blank":
         from filter import filter_traffic
-        # Keep API calls from ANY domain (Supabase/backend/auth hosts), not just
-        # the entered URL's domain. Static assets and tracking are still removed.
+        # Keep API calls from ANY domain (backend/API/auth hosts), not just the
+        # entered URL's domain. Static assets and tracking are still removed.
         entries = filter_traffic(entries)
 
     output = args.output or "traffic.json"
@@ -229,6 +229,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_serve = sub.add_parser("serve", help="Serve a connector definition as an MCP server")
     p_serve.add_argument("connector", help="Path to a connector definition (JSON)")
     p_serve.set_defaults(func=cmd_serve)
+
+    # Register the agent 'analyze' subcommand (lazy import to avoid cycle).
+    try:
+        from cli import agent as agent_cli
+        agent_cli.add_subparser(sub)
+    except Exception as exc:  # noqa: BLE001
+        print(f"warning: analyze subcommand unavailable ({exc})", file=sys.stderr)
 
     return parser
 

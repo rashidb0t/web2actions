@@ -1,0 +1,71 @@
+"""
+Tests for the Web2Actions agent `analyze` command (Module 17 / STORY-17.1).
+
+Verifies the CLI wiring and that cmd_analyze drives the provider-agnostic LLM
+backend (mocked) to summarize captured traffic. No live API call is made.
+"""
+
+import argparse
+import json
+import os
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+
+def _make_dump(path):
+    data = [
+        {"method": "GET", "url": "https://api.example.com/v1/customers", "resource_type": "xhr"},
+        {"method": "POST", "url": "https://abc.supabase.co/rest/v1/tasks", "resource_type": "fetch"},
+        {"method": "GET", "url": "https://site.com/_next/static/chunks/x.js", "resource_type": "script"},
+    ]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+
+class _FakeChoice:
+    def __init__(self, c):
+        self.message = type("M", (), {"content": c})()
+
+
+class _FakeResp:
+    def __init__(self, c):
+        self.choices = [_FakeChoice(c)]
+
+
+class TestAnalyze(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.dump = os.path.join(self.tmp, "traffic.json")
+        _make_dump(self.dump)
+
+    def test_analyze_missing_dump_returns_one(self):
+        from cli import agent as agent_cli
+        args = argparse.Namespace(dump="", model=None)
+        self.assertEqual(agent_cli.cmd_analyze(args), 1)
+
+    def test_analyze_drives_llm_and_reports(self):
+        from cli import agent as agent_cli
+
+        # Resolve agent.llm through the already-imported cli.agent module's helper
+        # to avoid relying on the fragile bare `import agent` in the discover env.
+        sys.path.insert(0, ROOT)
+        from agent import llm as llm
+
+        args = argparse.Namespace(dump=self.dump, model="openai/gpt-4o-mini")
+        reply = "1. GET /v1/customers - read\n2. POST /rest/v1/tasks - write"
+        with mock.patch.object(llm, "litellm") as ml:
+            ml.completion.return_value = _FakeResp(reply)
+            rc = agent_cli.cmd_analyze(args)
+        self.assertEqual(rc, 0)
+        # The LLM must have been called once.
+        ml.completion.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()

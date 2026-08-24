@@ -48,21 +48,34 @@ def build_extraction_prompt(traffic_dump: List[Dict[str, Any]]) -> str:
 def run_llm_extraction(
     traffic_dump: List[Dict[str, Any]],
     model: str,
+    max_attempts: int = 3,
 ) -> dict:
     """
     Call the LLM (provider resolved from the model name by litellm) to derive a
-    connector definition, and parse the JSON response.
+    connector definition, and parse the JSON response. Retries on empty or
+    non-JSON responses so a transient model hiccup doesn't immediately escalate.
     """
     prompt = build_extraction_prompt(traffic_dump)
-    response = litellm.completion(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = response.choices[0].message.content
-    parsed = json.loads(content)
-    if not isinstance(parsed, dict):
-        raise ValueError("LLM response was not a JSON object")
-    return parsed
+    last_error: str = "No LLM response"
+    for attempt in range(max_attempts):
+        response = litellm.completion(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = response.choices[0].message.content if response.choices else None
+        if not content or not content.strip():
+            last_error = "LLM returned an empty response"
+            continue
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as exc:
+            last_error = f"LLM returned non-JSON: {exc}"
+            continue
+        if not isinstance(parsed, dict):
+            last_error = "LLM response was not a JSON object"
+            continue
+        return parsed
+    raise ValueError(last_error)
 
 
 def extract_connector_definition(

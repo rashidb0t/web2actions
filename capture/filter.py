@@ -68,9 +68,10 @@ def is_api_candidate(
     Evaluate if a captured network entry represents a meaningful API endpoint.
 
     Filters out static assets and tracking requests. By default it considers
-    requests to ANY domain (so backend/API/auth hosts like a Supabase instance
-    survive capture). If `keep_domains` is given, requests to hosts not in that
-    list are dropped — this is opt-in, not the default.
+    requests to ANY domain, so backend/API/auth hosts (Supabase, a custom API,
+    a separate auth domain, etc.) survive capture. If `keep_domains` is given,
+    requests to hosts not in that list are dropped — this is opt-in, not the
+    default.
     """
     url = entry.get("url", "")
     resource_type = entry.get("resource_type", "")

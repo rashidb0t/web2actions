@@ -118,8 +118,8 @@ def cmd_capture(args: argparse.Namespace) -> int:
     entries = recorder.get_entries()
     if args.filter and url != "about:blank":
         from filter import filter_traffic
-        # Keep API calls from ANY domain (Supabase/backend/auth hosts), not just
-        # the entered URL's domain. Static assets and tracking are still removed.
+        # Keep API calls from ANY domain (backend/API/auth hosts), not just the
+        # entered URL's domain. Static assets and tracking are still removed.
         entries = filter_traffic(entries)
 
     output = args.output or "traffic.json"

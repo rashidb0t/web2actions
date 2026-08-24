@@ -44,7 +44,10 @@ web2actions model --aliases             # list aliases
 ### `analyze` — discover a site's API surface (agent harness)
 
 Runs the agent over captured traffic and lists the meaningful API endpoints
-(using your configured LLM — any provider via litellm):
+(using your configured LLM — any provider via litellm). It reverse-engineers
+**almost any** backend — a custom REST API, GraphQL, SDK/RPC protocols,
+form-based server actions, or a backend on a completely different domain
+(like Supabase) — by analyzing the real traffic rather than assuming a shape:
 
 ```bash
 web2actions capture https://app.example.com          # produces traffic.json

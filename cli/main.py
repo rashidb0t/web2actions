@@ -59,6 +59,64 @@ def cmd_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_capture(args: argparse.Namespace) -> int:
+    """Open a browser for the user to log in and drive; record its traffic to a dump."""
+    from session import BrowserSession
+    from recorder import NetworkRecorder
+
+    url = args.url or "about:blank"
+
+    if args.login:
+        if not (args.username and args.password):
+            print("Login requested: pass --username and --password with --login")
+            return 1
+
+    from session import BrowserSession
+    from recorder import NetworkRecorder
+
+    session = BrowserSession(headless=False)
+    page = session.start()
+    recorder = NetworkRecorder()
+    recorder.start(page)
+    page.goto(url, wait_until="domcontentloaded")
+
+    if args.login:
+        from session import perform_login
+        perform_login(
+            page,
+            url,
+            args.username_selector or "#username",
+            args.username,
+            args.password_selector or "#password",
+            args.password,
+            args.submit_selector or "#submit-btn",
+            args.success_indicator,
+        )
+
+    print("Browser opened. Log in and perform the actions you want captured.")
+    print("When done, close the browser (or press Enter here) to finish capture.")
+    try:
+        input("Press Enter when finished capturing...")
+    except EOFError:
+        pass
+
+    recorder.stop()
+    session.close()
+
+    entries = recorder.get_entries()
+    if args.filter and url != "about:blank":
+        from filter import filter_traffic
+        from urllib.parse import urlparse
+        target = urlparse(url).netloc
+        entries = filter_traffic(entries, target_domain=target)
+
+    output = args.output or "traffic.json"
+    with open(output, "w", encoding="utf-8") as file:
+        json.dump(entries, file, indent=2)
+    print(f"Captured {len(entries)} requests -> {output}")
+    return 0
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     """Validate a connector definition against the connector-spec schema."""
     from validate import validate_connector
@@ -87,6 +145,19 @@ def cmd_serve(args: argparse.Namespace) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="web2actions", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_cap = sub.add_parser("capture", help="Open a browser, record traffic for the user's login + actions")
+    p_cap.add_argument("url", help="The website URL to open")
+    p_cap.add_argument("--login", action="store_true", help="Automate a form login (needs --username/--password)")
+    p_cap.add_argument("--username", help="Username for --login")
+    p_cap.add_argument("--password", help="Password for --login")
+    p_cap.add_argument("--username-selector", default="#username")
+    p_cap.add_argument("--password-selector", default="#password")
+    p_cap.add_argument("--submit-selector", default="#submit-btn")
+    p_cap.add_argument("--success-indicator", help="Selector to wait for after login")
+    p_cap.add_argument("--filter", action="store_true", help="Filter out noise from the captured dump")
+    p_cap.add_argument("--output", "-o", help="Output traffic path (default traffic.json)")
+    p_cap.set_defaults(func=cmd_capture)
 
     p_gen = sub.add_parser("generate", help="Produce a connector definition from a traffic dump")
     p_gen.add_argument("traffic", help="Path to a captured traffic dump (JSON)")

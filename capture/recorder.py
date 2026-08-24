@@ -9,27 +9,34 @@ from playwright.sync_api import Page, Request, Response
 
 
 class NetworkRecorder:
-    """Listens to network events on a Playwright page and records all traffic."""
+    """Listens to network events on a Playwright page or context and records all traffic."""
 
     def __init__(self):
         self.entries: List[Dict[str, Any]] = []
         self._request_map: Dict[Request, Dict[str, Any]] = {}
         self._response_map: Dict[int, Response] = {}
-        self._page: Optional[Page] = None
+        self._target = None  # page or context
         self._is_recording: bool = False
 
     def start(self, page: Page):
-        """Attach request and response listeners to the page."""
-        self._page = page
+        """Attach request and response listeners to a page (or its context).
+
+        Using the page's browser context catches requests from every frame,
+        popup, and new tab in the session, so SPA/navigation API calls are
+        not missed.
+        """
+        self._target = page
         self._is_recording = True
-        page.on("request", self._handle_request)
-        page.on("response", self._handle_response)
+        context = page.context
+        context.on("request", self._handle_request)
+        context.on("response", self._handle_response)
 
     def stop(self):
         """Detach network listeners and finalize response bodies."""
-        if self._page is not None and self._is_recording:
-            self._page.remove_listener("request", self._handle_request)
-            self._page.remove_listener("response", self._handle_response)
+        if self._target is not None and self._is_recording:
+            context = self._target.context
+            context.remove_listener("request", self._handle_request)
+            context.remove_listener("response", self._handle_response)
             self._is_recording = False
         self._finalize_response_bodies()
 

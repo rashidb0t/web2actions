@@ -230,6 +230,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("connector", help="Path to a connector definition (JSON)")
     p_serve.set_defaults(func=cmd_serve)
 
+    # Register the agent 'analyze' subcommand (lazy import to avoid cycle).
+    try:
+        from cli import agent as agent_cli
+        agent_cli.add_subparser(sub)
+    except Exception as exc:  # noqa: BLE001
+        print(f"warning: analyze subcommand unavailable ({exc})", file=sys.stderr)
+
     return parser
 
 

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "web2actions"
+version = "0.1.0"
+description = "Turn a website into an MCP server your AI agent can use — no API required."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "anyllm>=0.2.4",
+    "jsonschema>=4.0",
+    "requests>=2.0",
+    "playwright>=1.40",
+    "mcp>=2.0.0",
+]
+
+[project.scripts]
+web2actions = "cli.main:main"
+
+[tool.setuptools]
+packages = ["cli"]

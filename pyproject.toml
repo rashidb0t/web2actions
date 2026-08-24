@@ -21,4 +21,4 @@ dependencies = [
 web2actions = "cli.main:main"
 
 [tool.setuptools]
-packages = ["cli"]
+packages = ["cli", "agent"]

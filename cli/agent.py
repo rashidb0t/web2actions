@@ -46,6 +46,13 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         print("Traffic dump is empty or not a JSON array.")
         return 1
 
+    # Refuse if the dump contains challenge signals.
+    from agent.guards import CHALLENGE_MESSAGE, detect_challenges
+    verdict = detect_challenges(entries)
+    if verdict["blocked"]:
+        print(CHALLENGE_MESSAGE.format(reasons=", ".join(verdict["reasons"])))
+        return 1
+
     from agent import llm as llm_backend
     from agent.llm import resolve_model
 

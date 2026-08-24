@@ -87,6 +87,25 @@ class TestAnalyze(unittest.TestCase):
         self.assertEqual(conn["name"], "www-acme-com")
         self.assertEqual(len(conn["tools"]), 2)
 
+    def test_analyze_refuses_on_mfa_dump(self):
+        """analyze calls neither the LLM nor writes output when the dump has MFA signals."""
+        from cli import agent as agent_cli
+        from agent import llm as llm
+
+        dump = os.path.join(self.tmp, "mfa_traffic.json")
+        with open(dump, "w", encoding="utf-8") as f:
+            json.dump([{"method": "GET", "url": "https://app.acme.com/verify/otp",
+                        "resource_type": "fetch"}], f)
+
+        out = os.path.join(self.tmp, "should_not_exist.json")
+        args = argparse.Namespace(dump=dump, model="openai/gpt-4o-mini",
+                                  url="https://www.acme.com", output=out)
+        with mock.patch.object(llm, "litellm") as ml:
+            rc = agent_cli.cmd_analyze(args)
+        self.assertEqual(rc, 1)
+        ml.completion.assert_not_called()
+        self.assertFalse(os.path.exists(out))
+
 
 if __name__ == "__main__":
     unittest.main()

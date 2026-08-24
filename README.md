@@ -118,10 +118,15 @@ Wires the connector to your AI agent's MCP client over stdio.
 
 ```bash
 web2actions capture https://example.com --filter -o dump.json
-web2actions generate dump.json --model claude-sonnet-4 -o connector.json
+web2actions analyze dump.json --assume -o connector.json   # agent discovers API → connector
 web2actions validate connector.json
 web2actions serve connector.json
 ```
+
+Works for almost any backend (a custom REST API, GraphQL, a Supabase-backed app,
+form server-actions, a backend on a different domain) — capture records all
+hosts, the agent reverse-engineers the real API, and the result is served as MCP.
+Sites behind MFA/CAPTCHA/anti-bot are refused with a clear message.
 
 ### Start from an existing example (no capture needed)
 

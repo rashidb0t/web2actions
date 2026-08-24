@@ -24,6 +24,19 @@ module 1 connector-spec validation), `run_extraction_job` returns
 `needs_escalation` — the job is **never silently marked done**. The caller
 (or module 6's sandboxed fallback) uses that flag to escalate.
 
+## Sandboxed escalation (STORY-6.1)
+
+- `prompts/escalation.txt` — the escalation prompt template.
+- `escalate.py`
+  - `load_escalation_prompt()` / `build_escalation_prompt(disp, prev, errors)` — prompt assembly.
+  - `escalate_and_repair(disp, prev, errors, llm_call, max_attempts)` — asks a
+    stronger-model LLM to repair the connector definition, validates the
+    result, and repeats up to `max_attempts`. Returns a status-flagged result.
+  - Fixes only the JSON connector definition, never an application.
+- Designed to run inside an isolated sandbox (no host filesystem access;
+  network egress limited to target site + LLM API); the sandbox boundary is a
+  deployment concern.
+
 ## Tests
 
 - `tests/test_extract.py` — prompt loading, valid extraction, schema/parse failures.

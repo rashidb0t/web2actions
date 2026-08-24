@@ -40,9 +40,12 @@ def _scan_urls(entries: List[Dict[str, Any]]) -> Dict[str, bool]:
             found["captcha"] = True
         if any(t in url for t in _BOT_BODY):
             found["bot"] = True
-        # A captured response body (if present) can carry markers too.
+        # A captured response body (if present) can carry markers too — but only
+        # for document/fetch/xhr responses. Script/static bundles contain the
+        # app's own code (words like "captcha", "challenge") and would false-positive.
+        rt = (e.get("resource_type") or "").lower()
         body = (e.get("response_body") or "").lower()
-        if body:
+        if body and rt in ("document", "fetch", "xhr"):
             if any(t in body for t in _MFA_TEXT):
                 found["mfa"] = True
             if any(t in body for t in _CAPTCHA_URL):

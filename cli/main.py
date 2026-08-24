@@ -106,11 +106,32 @@ def cmd_capture(args: argparse.Namespace) -> int:
         )
 
     print("Browser opened. Log in and perform the actions you want captured.")
-    print("When done, close the browser (or press Enter here) to finish capture.")
+    print("When done, press Enter here — the session stays alive and we'll")
+    print("auto-visit a few common pages to capture the authenticated data calls,")
+    print("then finalize the traffic dump.")
     try:
-        input("Press Enter when finished capturing...")
+        input("Press Enter when you're logged in: ")
     except EOFError:
         pass
+
+    # Keep the authenticated session alive; visit candidate data pages so the
+    # post-login API calls actually fire and get recorded (the call that was
+    # previously lost because we closed immediately on Enter).
+    common_pages = (
+        "/", "/dashboard", "/home", "/tasks", "/projects", "/kanban",
+        "/backlog", "/items", "/data", "/api", "/account",
+    )
+    visited = 0
+    for path in common_pages:
+        try:
+            page.goto(url.rstrip("/") + path, wait_until="domcontentloaded", timeout=10000)
+            page.wait_for_timeout(800)
+            visited += 1
+        except Exception:
+            continue
+        if visited >= (args.auto_pages or 6):
+            break
+    page.wait_for_timeout(1500)
 
     recorder.stop()
     session.close()
@@ -223,6 +244,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_cap.add_argument("--success-indicator", help="Selector to wait for after login")
     p_cap.add_argument("--filter", action="store_true", help="Filter out noise from the captured dump")
     p_cap.add_argument("--output", "-o", help="Output traffic path (default traffic.json)")
+    p_cap.add_argument("--auto-pages", type=int, default=6,
+                       help="How many common pages to auto-visit after you press Enter (default 6)")
     p_cap.set_defaults(func=cmd_capture)
 
     p_gen = sub.add_parser("generate", help="Produce a connector definition from a traffic dump")

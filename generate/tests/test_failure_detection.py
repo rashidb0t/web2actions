@@ -53,19 +53,16 @@ def valid_connector_json() -> str:
 
 
 class _FakeResponse:
-    """Minimal stand-in for anyllm's Response object."""
+    """Minimal stand-in for litellm.completion's response object."""
 
     def __init__(self, text: str):
-        self._text = text
-
-    def __str__(self):
-        return self._text
+        self.choices = [type("C", (), {"message": type("M", (), {"content": text})()})()]
 
 
 class TestFailureDetection(unittest.TestCase):
     """Test suite for extraction failure detection and escalation flagging."""
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_invalid_json_is_needs_escalation(self, mock_chat):
         """An LLM returning invalid JSON must be flagged needs_escalation, never done."""
         mock_chat.return_value = _FakeResponse("This is not json at all")
@@ -75,7 +72,7 @@ class TestFailureDetection(unittest.TestCase):
         self.assertIsNone(result["connector"])
         self.assertTrue(result["errors"])
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_schema_invalid_is_needs_escalation(self, mock_chat):
         """Connector JSON that violates the schema must be flagged needs_escalation."""
         bad_connector = json.dumps({"name": "example-api", "version": "1.0.0"})  # missing tools/auth
@@ -86,7 +83,7 @@ class TestFailureDetection(unittest.TestCase):
         self.assertIsNotNone(result["connector"])
         self.assertTrue(result["errors"])
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_valid_connector_is_success(self, mock_chat):
         """A valid extraction must be marked success with the connector attached."""
         mock_chat.return_value = _FakeResponse(valid_connector_json())

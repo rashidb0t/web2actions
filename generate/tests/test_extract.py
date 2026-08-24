@@ -3,7 +3,7 @@ Unit tests for generate/extract.py (STORY-4.1).
 
 Validates that a filtered traffic dump produces connector-definition JSON
 that passes the module 1 connector-spec validator. The LLM call is patched
-(mocked) so no live API budget is used, but the real anyllm.chat path is
+(mocked) so no live API budget is used, but the real litellm.completion path is
 exercised through the patch.
 """
 
@@ -66,13 +66,10 @@ def valid_connector_json() -> str:
 
 
 class _FakeResponse:
-    """Minimal stand-in for anyllm's Response object."""
+    """Minimal stand-in for litellm.completion's response object."""
 
     def __init__(self, text: str):
-        self._text = text
-
-    def __str__(self):
-        return self._text
+        self.choices = [type("C", (), {"message": type("M", (), {"content": text})()})()]
 
 
 class TestExtraction(unittest.TestCase):
@@ -90,7 +87,7 @@ class TestExtraction(unittest.TestCase):
         self.assertIn("api.example.com/auth/login", prompt)
         self.assertNotIn("{traffic_dump}", prompt)
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_extract_returns_valid_connector(self, mock_chat):
         """A mocked LLM returning valid JSON must produce a connector that passes validation."""
         mock_chat.return_value = _FakeResponse(valid_connector_json())
@@ -102,7 +99,7 @@ class TestExtraction(unittest.TestCase):
         self.assertTrue(is_valid, f"Extracted connector invalid: {error}")
         self.assertEqual(connector["name"], "example-api")
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_extract_raises_on_invalid_connector(self, mock_chat):
         """An LLM response that is valid JSON but violates the schema must raise."""
         bad_connector = json.dumps({"name": "example-api", "version": "1.0.0"})  # missing required tools/auth
@@ -111,7 +108,7 @@ class TestExtraction(unittest.TestCase):
         with self.assertRaises(ValueError):
             extract_connector_definition(sample_traffic_dump(), model="test-model")
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_extract_raises_on_non_object_json(self, mock_chat):
         """A JSON response that is not an object (e.g. a list) must raise."""
         mock_chat.return_value = _FakeResponse("[]")

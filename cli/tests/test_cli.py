@@ -62,7 +62,7 @@ class TestCliGenerate(unittest.TestCase):
             status = "needs_escalation"
             errors = ["no provider"]
 
-        with mock.patch("anyllm.chat", side_effect=RuntimeError("No LLM provider is available")):
+        with mock.patch("litellm.completion", side_effect=RuntimeError("No LLM provider is available")):
             code = cli_generate(args)
         self.assertEqual(code, 1)
         os.unlink(traffic.name)

@@ -10,4 +10,5 @@ node_modules/
 dist/
 build/
 .env
-.DS_Store*.egg-info/
+.DS_Store
+*.egg-info/

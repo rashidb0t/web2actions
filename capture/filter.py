@@ -60,10 +60,17 @@ def is_analytics_or_tracking(url: str) -> bool:
     return any(re.search(pattern, lower_url) is not None for pattern in TRACKING_PATTERNS)
 
 
-def is_api_candidate(entry: Dict[str, Any], target_domain: Optional[str] = None) -> bool:
+def is_api_candidate(
+    entry: Dict[str, Any],
+    keep_domains: Optional[List[str]] = None,
+) -> bool:
     """
     Evaluate if a captured network entry represents a meaningful API endpoint.
-    Filters out static assets and tracking requests.
+
+    Filters out static assets and tracking requests. By default it considers
+    requests to ANY domain (so backend/API/auth hosts like a Supabase instance
+    survive capture). If `keep_domains` is given, requests to hosts not in that
+    list are dropped — this is opt-in, not the default.
     """
     url = entry.get("url", "")
     resource_type = entry.get("resource_type", "")
@@ -77,11 +84,11 @@ def is_api_candidate(entry: Dict[str, Any], target_domain: Optional[str] = None)
     if is_analytics_or_tracking(url):
         return False
 
-    # Optional domain filter
-    if target_domain:
+    # Optional host allow-list (opt-in). Not applied by default, so cross-domain
+    # API calls (e.g. a Supabase REST host) are kept.
+    if keep_domains:
         entry_domain = urlparse(url).netloc.lower()
-        target = target_domain.lower()
-        if entry_domain != target and not entry_domain.endswith("." + target):
+        if not any(entry_domain == d.lower() or entry_domain.endswith("." + d.lower()) for d in keep_domains):
             return False
 
     # Check for API indicators (methods other than GET, or json/xhr/fetch indicators)
@@ -106,7 +113,7 @@ def is_api_candidate(entry: Dict[str, Any], target_domain: Optional[str] = None)
 
 def filter_traffic(
     entries: List[Dict[str, Any]],
-    target_domain: Optional[str] = None
+    keep_domains: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Filter a list of captured network entries, keeping only real API candidates."""
-    return [entry for entry in entries if is_api_candidate(entry, target_domain)]
+    return [entry for entry in entries if is_api_candidate(entry, keep_domains)]

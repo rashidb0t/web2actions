@@ -55,6 +55,13 @@ class TestNoiseFilter(unittest.TestCase):
                 "resource_type": "fetch",
                 "response_headers": {"content-type": "application/json"},
             },
+            # Cross-domain API call (e.g. Supabase backend) — must be KEPT now
+            {
+                "method": "POST",
+                "url": "https://abc.supabase.co/rest/v1/tasks",
+                "resource_type": "fetch",
+                "response_headers": {"content-type": "application/json"},
+            },
             # Noise to be filtered out
             {
                 "method": "GET",
@@ -82,13 +89,31 @@ class TestNoiseFilter(unittest.TestCase):
             },
         ]
 
-        filtered = filter_traffic(raw_traffic, target_domain="api.example.com")
-        self.assertEqual(len(filtered), 3)
+        filtered = filter_traffic(raw_traffic)
+        self.assertEqual(len(filtered), 4)
 
         urls = [entry["url"] for entry in filtered]
         self.assertIn("https://api.example.com/v1/auth/login", urls)
         self.assertIn("https://api.example.com/v1/customers?page=1", urls)
         self.assertIn("https://api.example.com/v1/customers/c_456", urls)
+        # Cross-domain (Supabase) API call is preserved without a domain filter
+        self.assertIn("https://abc.supabase.co/rest/v1/tasks", urls)
+
+    def test_filter_keep_domains_is_opt_in(self):
+        """Passing keep_domains restricts to those hosts (opt-in filtering)."""
+        raw = [
+            {"method": "GET", "url": "https://api.example.com/v1/items",
+             "resource_type": "fetch", "response_headers": {"content-type": "application/json"}},
+            {"method": "GET", "url": "https://abc.supabase.co/rest/v1/table",
+             "resource_type": "fetch", "response_headers": {"content-type": "application/json"}},
+        ]
+        # With keep_domains, only the listed host survives.
+        only_api = filter_traffic(raw, keep_domains=["api.example.com"])
+        self.assertEqual([e["url"] for e in only_api], ["https://api.example.com/v1/items"])
+
+        # Without keep_domains, both survive.
+        both = filter_traffic(raw)
+        self.assertEqual(len(both), 2)
 
 
 if __name__ == "__main__":

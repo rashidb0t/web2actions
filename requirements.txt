@@ -3,3 +3,4 @@ anyllm>=0.2.4
 jsonschema>=4.0
 requests>=2.0
 playwright>=1.40
+mcp>=2.0.0

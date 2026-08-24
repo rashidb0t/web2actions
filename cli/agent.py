@@ -55,9 +55,16 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 
     from agent import llm as llm_backend
     from agent.llm import resolve_model
+    from agent.questions import ask, suggested_questions
 
     model = resolve_model(args.model)
     print(f"Analyzing {len(entries)} requests with model: {model}")
+
+    # Ask clarifying questions (or use defaults with --assume).
+    qs = suggested_questions(entries)
+    if qs:
+        answers = ask(qs, assume=args.assume)
+        print(f"  (assumed: {', '.join(answers.assumed) or 'none'})")
 
     # Summarize domains and methods so the LLM (and user) see the surface.
     from urllib.parse import urlparse
@@ -123,4 +130,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--model", help="LLM model (or use saved config / WEB2ACTIONS_MODEL)")
     p.add_argument("--url", help="The site URL (used as the connector websiteUrl / name)")
     p.add_argument("--output", "-o", help="Write the discovered connector definition JSON to this path")
+    p.add_argument("--assume", action="store_true",
+                   help="Answer clarifying questions with recommended defaults (no prompt)")
     p.set_defaults(func=cmd_analyze)

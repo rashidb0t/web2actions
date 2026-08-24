@@ -46,7 +46,7 @@ class TestAnalyze(unittest.TestCase):
 
     def test_analyze_missing_dump_returns_one(self):
         from cli import agent as agent_cli
-        args = argparse.Namespace(dump="", model=None, url=None, output=None)
+        args = argparse.Namespace(dump="", model=None, url=None, output=None, assume=False)
         self.assertEqual(agent_cli.cmd_analyze(args), 1)
 
     def test_analyze_drives_llm_and_reports(self):
@@ -57,7 +57,7 @@ class TestAnalyze(unittest.TestCase):
         sys.path.insert(0, ROOT)
         from agent import llm as llm
 
-        args = argparse.Namespace(dump=self.dump, model="openai/gpt-4o-mini", url=None, output=None)
+        args = argparse.Namespace(dump=self.dump, model="openai/gpt-4o-mini", url=None, output=None, assume=True)
         reply = "1. GET /v1/customers - read\n2. POST /rest/v1/tasks - write"
         with mock.patch.object(llm, "litellm") as ml:
             ml.completion.return_value = _FakeResp(reply)
@@ -74,7 +74,7 @@ class TestAnalyze(unittest.TestCase):
         out = os.path.join(self.tmp, "connector.json")
         args = argparse.Namespace(
             dump=self.dump, model="openai/gpt-4o-mini",
-            url="https://www.acme.com", output=out,
+            url="https://www.acme.com", output=out, assume=True,
         )
         report = "1. GET https://api.acme.com/v1/users - read - list\n2. POST https://api.acme.com/v1/users - write"
         with mock.patch.object(llm, "litellm") as ml:
@@ -99,7 +99,7 @@ class TestAnalyze(unittest.TestCase):
 
         out = os.path.join(self.tmp, "should_not_exist.json")
         args = argparse.Namespace(dump=dump, model="openai/gpt-4o-mini",
-                                  url="https://www.acme.com", output=out)
+                                  url="https://www.acme.com", output=out, assume=False)
         with mock.patch.object(llm, "litellm") as ml:
             rc = agent_cli.cmd_analyze(args)
         self.assertEqual(rc, 1)

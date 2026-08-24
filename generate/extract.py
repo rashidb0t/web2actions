@@ -18,6 +18,9 @@ from typing import Any, Dict, List
 
 import anyllm
 
+# Resolve the generate package sibling status module.
+from status import ExtractionStatus  # noqa: E402
+
 # Resolve the sibling connector-spec package so we can reuse its validator.
 _SIBLING = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "connector-spec"))
 if _SIBLING not in sys.path:
@@ -71,3 +74,33 @@ def extract_connector_definition(
     if not is_valid:
         raise ValueError(f"Extracted connector failed schema validation: {error_message}")
     return candidate
+
+
+def run_extraction_job(
+    traffic_dump: List[Dict[str, Any]],
+    model: str,
+) -> Dict[str, Any]:
+    """
+    Run one extraction job and return a status-flagged result, never raising.
+
+    On success: {"status": "success", "connector": {...}}.
+    On invalid/parseable-but-wrong output: {"status": "needs_escalation",
+    "errors": [...]}. The job is never silently marked done when the cheap path
+    fails — it is flagged for the sandboxed fallback (module 6) instead.
+    """
+    try:
+        candidate = run_llm_extraction(traffic_dump, model)
+        is_valid, error_message = validate_connector(candidate)
+        if not is_valid:
+            return {
+                "status": ExtractionStatus.NEEDS_ESCALATION.value,
+                "connector": candidate,
+                "errors": [error_message],
+            }
+        return {"status": ExtractionStatus.SUCCESS.value, "connector": candidate}
+    except (json.JSONDecodeError, ValueError) as exc:
+        return {
+            "status": ExtractionStatus.NEEDS_ESCALATION.value,
+            "connector": None,
+            "errors": [str(exc)],
+        }

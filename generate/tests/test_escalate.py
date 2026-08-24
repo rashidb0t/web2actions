@@ -57,7 +57,7 @@ def valid_connector_json() -> str:
 
 
 class _FakeResponse:
-    """Minimal stand-in for anyllm's Response."""
+    """Minimal stand-in for litellm's completion response."""
 
     def __init__(self, text: str):
         self._text = text
@@ -84,7 +84,7 @@ class TestEscalation(unittest.TestCase):
         self.assertIn("required property", prompt)
         self.assertNotIn("{traffic_dump}", prompt)
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_repair_produces_passing_connector(self, mock_chat):
         """A stronger-model repair that returns valid JSON must yield a passing connector."""
         mock_chat.return_value = _FakeResponse(valid_connector_json())
@@ -98,7 +98,7 @@ class TestEscalation(unittest.TestCase):
         self.assertEqual(result["status"], ExtractionStatus.SUCCESS.value)
         self.assertEqual(result["connector"]["name"], "example-api")
 
-    @mock.patch("anyllm.chat")
+    @mock.patch("litellm.completion")
     def test_repair_that_never_passes_is_needs_escalation(self, mock_chat):
         """If repair never yields valid JSON, the result is flagged needs_escalation."""
         mock_chat.return_value = _FakeResponse('{"name": "still-broken"}')

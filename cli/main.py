@@ -27,8 +27,20 @@ for _pkg in ("connector-spec", "capture", "generate", "validate", "mcp-runtime")
 
 
 def _resolve_model(model: Optional[str]) -> str:
-    """Return the model name, from --model or WEB2ACTIONS_MODEL env, defaulting to a safe choice."""
-    return model or os.environ.get("WEB2ACTIONS_MODEL", "gpt-4o-mini")
+    """Return the model, from --model, WEB2ACTIONS_MODEL env, or the saved config default."""
+    if model:
+        return model
+    env_model = os.environ.get("WEB2ACTIONS_MODEL")
+    if env_model:
+        return env_model
+    try:
+        from cli import config
+        saved = config.get_model()
+        if saved:
+            return saved
+    except Exception:
+        pass
+    return "openai/gpt-4o-mini"
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
@@ -131,6 +143,44 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_model(args: argparse.Namespace) -> int:
+    """Show or set the default LLM provider/model, and manage aliases."""
+    from cli import config
+
+    if args.set:
+        model_spec = args.set
+        config.set_model(model_spec)
+        print(f"Default model set to: {model_spec}")
+        return 0
+
+    if args.provider:
+        config.set_provider(args.provider)
+        print(f"Default provider set to: {args.provider}")
+        return 0
+
+    if args.show_aliases:
+        aliases = config.get_aliases()
+        if not aliases:
+            print("No user aliases defined.")
+        for name, value in aliases.items():
+            print(f"{name} = {value}")
+        return 0
+
+    if args.alias:
+        name, _, value = args.alias.partition("=")
+        config.set_alias(name.strip(), value.strip())
+        print(f"Alias '{name.strip()}' -> {value.strip()}")
+        return 0
+
+    # Show current config
+    model = config.get_model()
+    provider = config.get_provider()
+    print(f"Model:    {model or '(not set)'}")
+    print(f"Provider: {provider or '(not set)'}")
+    print("Set one with `web2actions model <provider>/<model>`.")
+    return 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     """Serve a connector definition as an MCP server over stdio."""
     import asyncio
@@ -145,6 +195,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="web2actions", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_model = sub.add_parser("model", help="Show or set the default LLM provider/model, manage aliases")
+    p_model.add_argument("set", nargs="?", help="Set default model, e.g. openai/gpt-4o-mini")
+    p_model.add_argument("--provider", help="Set default provider")
+    p_model.add_argument("--alias", help="Set an alias, e.g. tom=openai/gpt-4o-mini")
+    p_model.add_argument("--aliases", dest="show_aliases", action="store_true", help="List aliases")
+    p_model.set_defaults(func=cmd_model)
 
     p_cap = sub.add_parser("capture", help="Open a browser, record traffic for the user's login + actions")
     p_cap.add_argument("url", help="The website URL to open")

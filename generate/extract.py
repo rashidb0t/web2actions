@@ -5,10 +5,10 @@ Takes a filtered traffic dump, asks an LLM to produce a connector-definition
 JSON, validates it against the module 1 connector-spec schema, and returns
 the validated connector definition.
 
-The LLM provider is provider-agnostic via the `anyllm` library: the caller
-passes a model name (e.g. "gpt-4o", "claude-sonnet-4", "deepseek-chat") and
-anyllm resolves the provider at runtime, so it can be switched without code
-changes.
+The LLM provider is provider-agnostic via `litellm`: the caller passes a
+model name (e.g. "openai/gpt-4o-mini", "anthropic/claude-sonnet-4",
+"gemini/gemini-2.5-flash") and litellm resolves the provider at runtime, so
+it can be switched without code changes.
 """
 
 import json
@@ -16,7 +16,7 @@ import os
 import sys
 from typing import Any, Dict, List
 
-import anyllm
+import litellm
 
 # Resolve the generate package sibling status module.
 from status import ExtractionStatus  # noqa: E402
@@ -50,12 +50,16 @@ def run_llm_extraction(
     model: str,
 ) -> dict:
     """
-    Call the LLM (provider resolved from the model name by anyllm) to derive a
+    Call the LLM (provider resolved from the model name by litellm) to derive a
     connector definition, and parse the JSON response.
     """
     prompt = build_extraction_prompt(traffic_dump)
-    response = anyllm.chat(prompt, model=model)
-    parsed = json.loads(str(response))
+    response = litellm.completion(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    content = response.choices[0].message.content
+    parsed = json.loads(content)
     if not isinstance(parsed, dict):
         raise ValueError("LLM response was not a JSON object")
     return parsed

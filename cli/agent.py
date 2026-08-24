@@ -85,6 +85,25 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 
     print("\n=== Discovered API surface ===")
     print(report)
+
+    # Optionally turn the discovered endpoints into a connector definition JSON.
+    if args.output:
+        from agent.to_connector import build_connector, parse_report
+        from urllib.parse import urlparse
+
+        endpoints = parse_report(report)
+        if not endpoints:
+            print("No endpoints parsed from the report; nothing to write.")
+            return 1
+        host = urlparse(args.url or "https://example.com").netloc.replace(".", "-")
+        connector = build_connector(
+            endpoints, name=host or "connector", website_url=args.url or "https://example.com"
+        )
+        import json
+
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(connector, f, indent=2)
+        print(f"Wrote connector ({len(connector['tools'])} tools) -> {args.output}")
     return 0
 
 
@@ -95,4 +114,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> None:
     )
     p.add_argument("dump", nargs="?", help="Path to a captured traffic JSON dump")
     p.add_argument("--model", help="LLM model (or use saved config / WEB2ACTIONS_MODEL)")
+    p.add_argument("--url", help="The site URL (used as the connector websiteUrl / name)")
+    p.add_argument("--output", "-o", help="Write the discovered connector definition JSON to this path")
     p.set_defaults(func=cmd_analyze)

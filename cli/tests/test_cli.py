@@ -21,6 +21,7 @@ SPEC_DIR = os.path.join(ROOT, "connector-spec")
 if SPEC_DIR not in sys.path:
     sys.path.insert(0, SPEC_DIR)
 
+from cli.main import cmd_capture as cli_capture  # noqa: E402
 from cli.main import cmd_generate as cli_generate  # noqa: E402
 from cli.main import cmd_validate as cli_validate  # noqa: E402
 from cli.main import main as cli_main  # noqa: E402
@@ -69,6 +70,15 @@ class TestCliGenerate(unittest.TestCase):
     def test_resolve_model_defaults(self):
         self.assertEqual(_resolve_model(None), "gpt-4o-mini")
         self.assertEqual(_resolve_model("claude-sonnet-4"), "claude-sonnet-4")
+
+
+class TestCliCapture(unittest.TestCase):
+    """capture subcommand behaviors that don't need a live browser."""
+
+    def test_capture_login_requires_credentials(self):
+        """--login without --username/--password returns nonzero without opening a browser."""
+        args = mock.Mock(url="https://example.com", login=True, username=None, password=None)
+        self.assertEqual(cli_capture(args), 1)
 
 
 if __name__ == "__main__":

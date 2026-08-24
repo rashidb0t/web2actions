@@ -78,17 +78,23 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         f"[{e.get('method','GET')}] {e.get('url','')}" for e in entries[:150]
     )
     prompt = (
-        "You are reverse-engineering the API of a web app from captured traffic.\n"
-        "List the meaningful API endpoints (not static assets), each with:\n"
+        "You are reverse-engineering a web app from captured traffic into tool definitions.\n"
+        "The user logged in and visited several pages. Each distinct page/route they visited\n"
+        "is a real resource and should become a tool that loads that page's data.\n"
+        "List them, each with:\n"
         "- method, full URL\n"
-        "- a short human name (verb + resource)\n"
+        "- a short human name (verb + resource), e.g. 'list_tasks' for the tasks page\n"
         "- a one-line purpose\n"
-        "Ignore charts, fonts, _rsc/HTML server-rendering routes, and tracking.\n\n"
+        "- risk (read/write/destructive)\n"
+        "Ignore only true noise: charts/fonts/images, static asset bundles (.js/.css/.woff), "
+        "and tracking. Do NOT drop page routes like /dashboard, /tasks, /projects, /kanban, "
+        "/backlog — keep each as a tool.\n\n"
         f"CAPTURED TRAFFIC:\n{summary}"
     )
     system = (
         "You are an API discovery agent. Output a concise numbered list of real "
-        "endpoints with name, risk (read/write/destructive), and purpose."
+        "endpoints/page-routes with name, method, risk (read/write/destructive), and purpose. "
+        "Every page the user visited is a tool — do not omit them."
     )
     try:
         report = llm_backend.chat(prompt, model, system=system)

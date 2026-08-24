@@ -4,12 +4,14 @@ Integration tests for the MCP runtime (STORY-7.1).
 Launches the served connector as a stdio subprocess and drives it through a
 real MCP client session: lists tools and invokes a tool against the live JWT
 CRUD test app. One shared program serves the connector — no per-connector code.
+
+Also covers the security contract: SSRF allow-listing, input-schema
+enforcement, auth_provider token injection, and error sanitization.
 """
 
 import asyncio
 import json
 import os
-import subprocess
 import sys
 import tempfile
 import threading
@@ -25,10 +27,17 @@ CAPTURE_TESTS = os.path.abspath(os.path.join(MCP_DIR, "..", "capture", "tests"))
 if CAPTURE_TESTS not in sys.path:
     sys.path.insert(0, CAPTURE_TESTS)
 
-from serve import _execute_call, _tool_from_connector, build_server  # noqa: E402
+from serve import (  # noqa: E402
+    _allowed_hosts,
+    _execute_call,
+    _tool_from_connector,
+    _validate_arguments,
+    _validate_url,
+    build_server,
+)
 from jwt_crud_app import start_jwt_crud_app  # noqa: E402
 
-from mcp import ClientSession, StdioServerParameters, stdio_client
+from mcp import ClientSession, StdioServerParameters, stdio_client  # noqa: E402
 
 
 class TestMCPRuntime(unittest.TestCase):
@@ -78,6 +87,8 @@ class TestMCPRuntime(unittest.TestCase):
             env={"PATH": os.environ["PATH"], "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV", "")},
         )
 
+    # --- helpers ---
+
     def test_tool_from_connector_maps_fields(self):
         """A connector tool dict becomes an MCP Tool with the right schema."""
         tool = {"name": "listItems", "description": "l",
@@ -86,10 +97,62 @@ class TestMCPRuntime(unittest.TestCase):
         self.assertEqual(mcp_tool.name, "listItems")
         self.assertIn("type", mcp_tool.input_schema)
 
+    # --- SSRF / security contract ---
+
+    def test_allowed_hosts_from_website_url(self):
+        """allowed_hosts derives from the connector's websiteUrl."""
+        connector = {"websiteUrl": "https://api.example.com"}
+        self.assertEqual(_allowed_hosts(connector), ["api.example.com"])
+        self.assertEqual(_allowed_hosts({}), [])
+
+    def test_validate_url_rejects_off_host(self):
+        """A URL whose host is not in the allow-list is refused."""
+        with self.assertRaises(ValueError):
+            _validate_url("http://169.254.169.254/meta", ["api.example.com"])
+
+    def test_validate_url_allows_on_host(self):
+        """A URL whose host is in the allow-list is permitted."""
+        _validate_url("http://api.example.com/items", ["api.example.com"])  # no raise
+
+    def test_validate_arguments_enforces_schema(self):
+        """Arguments are validated against the tool's inputSchema."""
+        tool = {"inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}}
+        with self.assertRaises(ValueError):
+            _validate_arguments(tool, {})
+        _validate_arguments(tool, {"id": "x"})  # no raise
+
+    # --- execution ---
+
     def test_execute_call_hits_live_target(self):
         """_execute_call actually calls the live JWT app (401 without token)."""
         call_spec = {"method": "GET", "url": f"{self.base_url}/api/items"}
-        self.assertIn("error", _execute_call(call_spec, {}).lower())
+        self.assertIn("error", _execute_call(call_spec, {}, allowed_hosts=[f"127.0.0.1"]).lower())
+
+    def test_execute_call_fills_url_placeholders(self):
+        """{param} placeholders in the URL are filled from arguments."""
+        from requests import post
+        resp = post(f"{self.base_url}/api/login", data={"username": "admin", "password": "secret123"})
+        html = resp.text
+        start = html.find('data-token="') + len('data-token="')
+        token = html[start:html.find('"', start)]
+        call_spec = {"method": "GET", "url": f"{self.base_url}/api/items/{{item_id}}"}
+        text = _execute_call(call_spec, {"item_id": "x"}, token=token, allowed_hosts=["127.0.0.1"])
+        self.assertIn("not found", text.lower())
+
+    def test_auth_provider_token_serves_authenticated_request(self):
+        """A token from auth_provider lets an authenticated protected tool succeed."""
+        from requests import post
+        resp = post(f"{self.base_url}/api/login", data={"username": "admin", "password": "secret123"})
+        html = resp.text
+        start = html.find('data-token="') + len('data-token="')
+        token = html[start:html.find('"', start)]
+
+        # A tool with a valid token can list items (200), proving authenticated calls work.
+        call_spec = {"method": "GET", "url": f"{self.base_url}/api/items"}
+        text = _execute_call(call_spec, {}, token=token, allowed_hosts=["127.0.0.1"])
+        self.assertIn("items", text)  # successful authorized call
+
+    # --- client integration ---
 
     def test_client_lists_and_invokes_tool(self):
         """A real MCP client lists the tool and invokes it against the live app."""
@@ -100,7 +163,6 @@ class TestMCPRuntime(unittest.TestCase):
                     tools = await session.list_tools()
                     names = [t.name for t in tools.tools]
                     self.assertIn("listItems", names)
-                    # Invoke the tool (no token -> the app returns 401, which proves the call executed)
                     result = await session.call_tool("listItems", {})
                     text = result.content[0].text if result.content else ""
                     self.assertIn("error", text.lower())

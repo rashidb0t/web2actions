@@ -31,6 +31,16 @@ pip install -e .
 
 Every command is `web2actions <command> [options]`.
 
+### `model` — choose your LLM provider and model (persisted)
+
+```bash
+web2actions model                       # show current
+web2actions model google/gemini-2.5-flash   # set default model (persisted)
+web2actions model --provider openrouter # set default provider
+web2actions model --alias sonnet=anthropic/claude-sonnet-4  # alias
+web2actions model --aliases             # list aliases
+```
+
 ### `capture` — record a site's traffic
 
 Opens a browser to the URL, records the network traffic you generate as you
@@ -95,76 +105,67 @@ web2actions serve connector-spec/examples/simple-crm.json
 
 ## Bringing your own LLM (BYOK)
 
-Generation uses whatever LLM you point it at. Web2Actions never stores a key
-inside the project — you supply your own, chosen at runtime per invocation.
+Web2Actions uses **litellm**, which connects to 100+ providers through one
+OpenAI-compatible interface. You pick a provider and a model with simple
+commands — no code changes, and the choice is remembered for future runs.
 
 ### Supported providers
 
-The `generate` step is provider-agnostic. It can call:
+litellm supports 100+ providers, including **OpenAI, Anthropic, Google
+Gemini, OpenRouter, DeepSeek, Groq, xAI, Mistral, OpenAI-compatible local
+servers (Ollama / llama.cpp / vLLM), Bedrock, Azure, and more.**
 
-- **Cloud models**
-  - **OpenAI** — set `OPENAI_API_KEY`
-  - **Anthropic** — set `ANTHROPIC_API_KEY`
-- **Local models (free, no API key)**
-  - **Ollama** — run `ollama serve`, then use a model like `llama3` or `qwen2.5`
-  - **llama.cpp** — point it at a local GGUF model server
+Each provider reads its standard API-key environment variable (for example
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
+`DEEPSEEK_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`) or, for local servers,
+needs no key at all.
 
-### 1. Add an API key (environment variable)
-
-Export the key for the provider you want in your shell (or your `~/.bashrc` /
-`~/.zshrc` so it persists):
+### Set the default model with a simple command
 
 ```bash
-# OpenAI
-export OPENAI_API_KEY="sk-..."
+# Pick a provider + model once; it is remembered (saved to ~/.web2actions/config.toml)
+web2actions model openai/gpt-4o-mini
+web2actions model anthropic/claude-sonnet-4
+web2actions model gemini/gemini-2.5-flash
+web2actions model openrouter/anthropic/claude-sonnet-4
+web2actions model deepseek/deepseek-chat
 
-# Anthropic
-export ANTHROPIC_API_KEY="sk-ant-..."
+# Show the current model
+web2actions model
+
+# Set a default provider
+web2actions model --provider openrouter
+
+# Add a short alias, then use it anywhere
+web2actions model --alias sonnet=anthropic/claude-sonnet-4
+web2actions generate dump.json --model sonnet
+
+# List your aliases
+web2actions model --aliases
 ```
 
-### 2. Pick a provider + model
-
-Models are selected by name. To explicitly route to a provider, prefix the
-model with the provider and a slash (`provider/model`). If you give a bare
-model name with no prefix, the provider is **auto-detected** (local providers
-first, then cloud), using whichever is available.
+Once set, `generate` uses that model automatically:
 
 ```bash
-# Aim at a specific provider with `provider/model`:
-web2actions generate dump.json --model openai/gpt-4o-mini      # OpenAI
-web2actions generate dump.json --model anthropic/claude-sonnet-4  # Anthropic
-web2actions generate dump.json --model ollama/llama3           # local (Ollama)
-
-# Bare model name: provider is auto-detected from what's available
-web2actions generate dump.json --model gpt-4o-mini
+web2actions model google/gemini-2.5-flash
+export GEMINI_API_KEY=...            # only needed the first time, per provider
+web2actions generate dump.json       # uses gemini-2.5-flash
 ```
 
-You can also set the default model once via the `WEB2ACTIONS_MODEL` env var,
-so you don't have to pass `--model` every time:
+### Override per run
+
+Pass `--model` to use a different provider/model for a single command, or set
+the `WEB2ACTIONS_MODEL` env var. Precedence: `--model` > `WEB2ACTIONS_MODEL` >
+saved config.
 
 ```bash
-export WEB2ACTIONS_MODEL="claude-sonnet-4"
-web2actions generate dump.json        # uses claude-sonnet-4
+web2actions generate dump.json --model openai/gpt-4o-mini
 ```
-
-### Switching providers
-
-Changes the model name and (for cloud) ensures the matching API key is set.
-No code or config file changes needed:
-
-```bash
-# Same command, different provider, via the provider/model prefix:
-web2actions generate dump.json --model openai/gpt-4o-mini        # OpenAI
-web2actions generate dump.json --model anthropic/claude-sonnet-4 # Anthropic
-web2actions generate dump.json --model ollama/llama3             # local, free
-```
-
-Precedence: an explicit `--model` flag wins over `WEB2ACTIONS_MODEL`.
 
 ### If no key is set
 
-`generate` fails gracefully and tells you what to do — set a cloud key or run
-a local model server. It never crashes with a stack trace.
+`generate` fails gracefully and tells you which key to set — it never crashes
+with a raw stack trace.
 
 ## Repository layout
 

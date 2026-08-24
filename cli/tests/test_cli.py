@@ -9,6 +9,7 @@ generate BYOK error path. generate's LLM call is not exercised with a real key
 import json
 import os
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -51,6 +52,16 @@ class TestCliValidate(unittest.TestCase):
 class TestCliGenerate(unittest.TestCase):
     """generate surfaces a clean BYOK error (exit 1) when no LLM provider is set."""
 
+    def setUp(self):
+        self._old_home = os.environ.get("HOME")
+        os.environ["HOME"] = tempfile.mkdtemp()
+
+    def tearDown(self):
+        if self._old_home is not None:
+            os.environ["HOME"] = self._old_home
+        else:
+            os.environ.pop("HOME", None)
+
     def test_generate_missing_key_returns_one(self):
         import tempfile
         traffic = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
@@ -68,7 +79,7 @@ class TestCliGenerate(unittest.TestCase):
         os.unlink(traffic.name)
 
     def test_resolve_model_defaults(self):
-        self.assertEqual(_resolve_model(None), "gpt-4o-mini")
+        self.assertEqual(_resolve_model(None), "openai/gpt-4o-mini")
         self.assertEqual(_resolve_model("claude-sonnet-4"), "claude-sonnet-4")
 
 
@@ -79,6 +90,27 @@ class TestCliCapture(unittest.TestCase):
         """--login without --username/--password returns nonzero without opening a browser."""
         args = mock.Mock(url="https://example.com", login=True, username=None, password=None)
         self.assertEqual(cli_capture(args), 1)
+
+
+class TestCliModel(unittest.TestCase):
+    """model subcommand persists and reads the default model to config."""
+
+    def setUp(self):
+        self._old_home = os.environ.get("HOME")
+        os.environ["HOME"] = tempfile.mkdtemp()
+
+    def tearDown(self):
+        if self._old_home is not None:
+            os.environ["HOME"] = self._old_home
+        else:
+            os.environ.pop("HOME", None)
+
+    def test_model_set_and_show(self):
+        from cli.main import cmd_model
+        from cli import config
+        args = mock.Mock(set="google/gemini-2.5-flash", provider=None, alias=None, show_aliases=False)
+        self.assertEqual(cmd_model(args), 0)
+        self.assertEqual(config.get_model(), "google/gemini-2.5-flash")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,11 @@ No public API required.
 > The same philosophy applies in the hosted product — it's a popup browser you
 > drive. The CLI just runs that browser for you.
 
+> **Not supported: MFA / CAPTCHA / anti-bot challenges.** If the site requires
+> two-factor auth, a CAPTCHA, or sits behind an anti-bot challenge, Web2Actions
+> detects it and refuses with a clear message rather than producing a broken
+> connector.
+
 ## Install
 
 ```bash

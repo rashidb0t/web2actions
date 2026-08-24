@@ -116,6 +116,15 @@ def cmd_capture(args: argparse.Namespace) -> int:
     session.close()
 
     entries = recorder.get_entries()
+
+    # Refuse if the site is behind MFA / CAPTCHA / anti-bot challenges.
+    from agent.guards import CHALLENGE_MESSAGE, detect_challenges
+    verdict = detect_challenges(entries)
+    if verdict["blocked"]:
+        print(CHALLENGE_MESSAGE.format(reasons=", ".join(verdict["reasons"])))
+        print("Nothing was written.")
+        return 1
+
     if args.filter and url != "about:blank":
         from filter import filter_traffic
         # Keep API calls from ANY domain (backend/API/auth hosts), not just the

@@ -13,15 +13,17 @@ challenge based on a single generic token.
 
 from typing import Any, Dict, List, Optional
 
-#: URL path/query tokens that strongly indicate MFA / 2FA flows.
-_MFA_URL_TOKENS = ("/mfa", "/2fa", "/two-factor", "/otp", "/verify", "/totp",
-                   "/authenticator", "twofactor", "2step", "verification-code")
+#: URL tokens that strongly indicate MFA / 2FA (specific, to avoid flagging
+#: benign /verify or /verify_token endpoints).
+_MFA_URL_TOKENS = ("/mfa", "/2fa", "/two-factor", "/otp", "/totp",
+                   "/authenticator", "2step", "verification-code")
 #: MFA-related words that might appear in response bodies / titles.
 _MFA_TEXT = ("two-factor", "two factor", "verification code", "authenticator app",
-             "multi-factor", "enter your code", "otp code")
+             "multi-factor", "enter your code", "otp code", "multi-factor authentication")
 
-#: CAPTCHA / anti-bot tokens in URLs / headless detection markers.
-_CAPTCHA_URL = ("captcha", "recaptcha", "hcaptcha", "g-recaptcha", "turnstile", "cf-turnstile")
+#: CAPTCHA / anti-bot tokens in URLs.
+_CAPTCHA_URL = ("captcha", "recaptcha", "hcaptcha", "g-recaptcha", "turnstile", "cf-turnstile", "grecaptcha")
+
 #: Anti-bot / challenge page markers (Cloudflare "Just a moment", ...).
 _BOT_BODY = ("just a moment", "not a robot", "unusual traffic", "challenge-platform",
              "cf-chl", "verifying you are human", "attention required")
@@ -43,6 +45,8 @@ def _scan_urls(entries: List[Dict[str, Any]]) -> Dict[str, bool]:
         if body:
             if any(t in body for t in _MFA_TEXT):
                 found["mfa"] = True
+            if any(t in body for t in _CAPTCHA_URL):
+                found["captcha"] = True
             if any(t in body for t in _BOT_BODY):
                 found["bot"] = True
     return found

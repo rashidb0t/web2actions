@@ -40,7 +40,7 @@ Every command is `web2actions <command> [options]`.
 
 ```bash
 web2actions model                       # show current
-web2actions model google/gemini-2.5-flash   # set default model (persisted)
+web2actions model gemini/gemini-2.5-flash   # set default model (persisted)
 web2actions model --provider openrouter # set default provider
 web2actions model --alias sonnet=anthropic/claude-sonnet-4  # alias
 web2actions model --aliases             # list aliases
@@ -176,12 +176,12 @@ web2actions generate dump.json --model sonnet
 web2actions model --aliases
 ```
 
-Once set, `generate` uses that model automatically:
+Once set, `analyze` uses that model automatically:
 
 ```bash
-web2actions model google/gemini-2.5-flash
+web2actions model gemini/gemini-2.5-flash
 export GEMINI_API_KEY=...            # only needed the first time, per provider
-web2actions generate dump.json       # uses gemini-2.5-flash
+web2actions analyze traffic.json --assume   # uses gemini-2.5-flash
 ```
 
 ### Override per run

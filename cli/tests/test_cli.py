@@ -108,9 +108,9 @@ class TestCliModel(unittest.TestCase):
     def test_model_set_and_show(self):
         from cli.main import cmd_model
         from cli import config
-        args = mock.Mock(set="google/gemini-2.5-flash", provider=None, alias=None, show_aliases=False)
+        args = mock.Mock(set="gemini/gemini-2.5-flash", provider=None, alias=None, show_aliases=False)
         self.assertEqual(cmd_model(args), 0)
-        self.assertEqual(config.get_model(), "google/gemini-2.5-flash")
+        self.assertEqual(config.get_model(), "gemini/gemini-2.5-flash")
 
 
 if __name__ == "__main__":

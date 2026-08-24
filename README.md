@@ -51,11 +51,13 @@ form-based server actions, or a backend on a completely different domain
 
 ```bash
 web2actions capture https://app.example.com          # produces traffic.json
-web2actions analyze traffic.json
+web2actions analyze traffic.json                      # shows the API surface
+web2actions analyze traffic.json --url https://app.example.com -o connector.json
 ```
 
 You can pick a model with `--model`, or it uses your saved `web2actions model`
-choice.
+choice. With `-o`, analyze writes a **connector-definition JSON** (validated
+against our schema) that you can then `validate` and `serve` as MCP.
 
 ### `capture` — record a site's traffic
 

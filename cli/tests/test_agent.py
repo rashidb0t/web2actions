@@ -46,7 +46,7 @@ class TestAnalyze(unittest.TestCase):
 
     def test_analyze_missing_dump_returns_one(self):
         from cli import agent as agent_cli
-        args = argparse.Namespace(dump="", model=None)
+        args = argparse.Namespace(dump="", model=None, url=None, output=None)
         self.assertEqual(agent_cli.cmd_analyze(args), 1)
 
     def test_analyze_drives_llm_and_reports(self):
@@ -57,7 +57,7 @@ class TestAnalyze(unittest.TestCase):
         sys.path.insert(0, ROOT)
         from agent import llm as llm
 
-        args = argparse.Namespace(dump=self.dump, model="openai/gpt-4o-mini")
+        args = argparse.Namespace(dump=self.dump, model="openai/gpt-4o-mini", url=None, output=None)
         reply = "1. GET /v1/customers - read\n2. POST /rest/v1/tasks - write"
         with mock.patch.object(llm, "litellm") as ml:
             ml.completion.return_value = _FakeResp(reply)
@@ -65,6 +65,27 @@ class TestAnalyze(unittest.TestCase):
         self.assertEqual(rc, 0)
         # The LLM must have been called once.
         ml.completion.assert_called_once()
+
+    def test_analyze_output_writes_connector(self):
+        """analyze --output writes a schema-valid connector from the report."""
+        from cli import agent as agent_cli
+        from agent import llm as llm
+
+        out = os.path.join(self.tmp, "connector.json")
+        args = argparse.Namespace(
+            dump=self.dump, model="openai/gpt-4o-mini",
+            url="https://www.acme.com", output=out,
+        )
+        report = "1. GET https://api.acme.com/v1/users - read - list\n2. POST https://api.acme.com/v1/users - write"
+        with mock.patch.object(llm, "litellm") as ml:
+            ml.completion.return_value = _FakeResp(report)
+            rc = agent_cli.cmd_analyze(args)
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.exists(out))
+        with open(out, encoding="utf-8") as f:
+            conn = json.load(f)
+        self.assertEqual(conn["name"], "www-acme-com")
+        self.assertEqual(len(conn["tools"]), 2)
 
 
 if __name__ == "__main__":

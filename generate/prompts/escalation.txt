@@ -1,0 +1,12 @@
+You are repairing a Web2Actions connector definition that failed schema validation.
+
+Raw network traffic:
+{traffic_dump}
+
+The previous connector definition attempt (which was invalid):
+{previous_connector}
+
+The schema validation errors it produced:
+{validation_errors}
+
+Produce a corrected connector definition as valid JSON that follows the connector specification schema (fields name, version, description, websiteUrl, auth, tools). Each tool needs name, description, risk (read/write/destructive), inputSchema, outputSchema, and call (method, url, headers, body). Keep names plain and English. Output only the corrected JSON object.

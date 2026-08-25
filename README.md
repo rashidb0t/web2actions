@@ -114,6 +114,21 @@ web2actions serve connector.json
 
 Wires the connector to your AI agent's MCP client over stdio.
 
+**Authenticated apps:** if the site needs a login session, pass a local auth
+file so every tool call is authenticated:
+
+```bash
+# auth.json can be:
+#   {"token": "your-bearer-token"}
+#   {"cookies": {"sessionid": "abc", "csrf": "xyz"}}
+#   or both
+web2actions serve connector.json --auth auth.json
+```
+
+Keep the auth file local and `chmod 600` — it never goes into the connector
+definition or logs. (Re-auth on expiry is a hosted-product feature; self-hosters
+rotate the file as needed.)
+
 ### End-to-end example
 
 ```bash

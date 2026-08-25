@@ -170,5 +170,5 @@ with a clear message.
 
 ## License
 
-Apache-2.0. Built on top of the open-source CLI-Anything / CLI-Anything-Web
-projects.
+Apache-2.0. Built on top of the open-source [CLI-Anything](https://github.com/HKUDS/CLI-Anything)
+and [CLI-Anything-Web](https://github.com/ItamarZand88/CLI-Anything-WEB) projects.

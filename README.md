@@ -1,228 +1,172 @@
 # Web2Actions
 
-**Turn a website into an MCP server your AI agent can use — no API required.**
+**Turn any website into an MCP server your AI agent can use — no API required.**
 
-Web2Actions watches a website's browser traffic, reverse-engineers the site's
-real network endpoints, and packages them into a clean set of named tools your
-AI agent can call via [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
-No public API required.
+Almost every website has data and actions, but few expose a clean public API.
+Web2Actions watches a site's browser traffic, reverse-engineers its real
+endpoints, and packages them into named tools your AI agent can call over
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io) — the open
+standard for connecting agents to tools.
 
-## How it works
+## Concepts
 
-1. **Capture** — log into a site once; the browser traffic is recorded.
-2. **Generate** — an LLM turns the captured traffic into a connector definition:
-   clean named tools with inputs, outputs, and risk tags.
-3. **Validate** — every tool is smoke-tested against the live site.
-4. **Serve** — the validated connector is exposed as a standard MCP server.
+- **Connector** — a JSON file describing a website's capabilities as a list of
+  tools (name, what it does, its inputs, its risk level, and the HTTP call
+  behind it). This is the artifact Web2Actions produces and everything else
+  operates on.
+- **MCP server** — the thing that exposes a connector's tools to an AI agent.
+  Web2Actions serves any connector as a standard MCP server, so your agent can
+  call the site's tools like any other tool.
+- **Capture** — the one step where a human is involved. A real browser opens;
+  *you* log in and use the site as you normally would, and Web2Actions records
+  the network traffic. It never guesses buttons or clicks for you.
+- **Agent** — an LLM (your choice of provider) that reads the captured traffic
+  and reverse-engineers it into a connector.
 
-> **Capture is human-driven, not automatic.** We don't guess every button or
-> click the site for you. A real browser opens on your machine; *you* log in and
-> perform the actions you want turned into tools, and we record that traffic.
-> The same philosophy applies in the hosted product — it's a popup browser you
-> drive. The CLI just runs that browser for you.
-
-> **Not supported: MFA / CAPTCHA / anti-bot challenges.** If the site requires
-> two-factor auth, a CAPTCHA, or sits behind an anti-bot challenge, Web2Actions
-> detects it and refuses with a clear message rather than producing a broken
-> connector.
+> **Not supported:** MFA / CAPTCHA / anti-bot challenges. If a site requires
+> those, Web2Actions detects it and stops with a clear message rather than
+> producing a broken connector.
 
 ## Install
 
 ```bash
 pip install -e .
+playwright install chromium      # downloads the browser used by `capture`
 ```
+
+## The full flow (90 seconds)
+
+```bash
+# 1. Model — one-time, saves your choice (see "LLM providers" below)
+web2actions model gemini/gemini-2.5-flash
+
+# 2. Capture — opens a browser; log in + use the site, then press Enter
+web2actions capture https://app.example.com -o traffic.json
+
+# 3. Analyze — an LLM turns the traffic into a connector (one tool per page/endpoint)
+web2actions analyze traffic.json --url https://app.example.com -o connector.json
+
+# 4. Validate + Serve — check it, then expose as MCP
+web2actions validate connector.json
+web2actions serve connector.json
+```
+
+That's it. After step 4, point your AI agent's MCP client at the server and the
+site's tools are callable.
 
 ## Commands
 
-Every command is `web2actions <command> [options]`.
-
-### `model` — choose your LLM provider and model (persisted)
+### `model` — choose your LLM
 
 ```bash
-web2actions model                       # show current
-web2actions model gemini/gemini-2.5-flash   # set default model (persisted)
-web2actions model --provider openrouter # set default provider
-web2actions model --alias sonnet=anthropic/claude-sonnet-4  # alias
-web2actions model --aliases             # list aliases
+web2actions model                      # show the current model
+web2actions model gemini/gemini-2.5-flash   # set & remember a model (one-time)
 ```
-
-### `analyze` — discover a site's API surface (agent harness)
-
-Runs the agent over captured traffic and lists the meaningful API endpoints
-(using your configured LLM — any provider via litellm). It reverse-engineers
-**almost any** backend — a custom REST API, GraphQL, SDK/RPC protocols,
-form-based server actions, or a backend on a completely different domain
-(like Supabase) — by analyzing the real traffic rather than assuming a shape:
-
-```bash
-web2actions capture https://app.example.com          # produces traffic.json
-web2actions analyze traffic.json                      # shows the API surface (asks clarifying questions)
-web2actions analyze traffic.json --url https://app.example.com -o connector.json
-web2actions analyze traffic.json --assume             # no prompts — use recommended defaults
-```
-
-You can pick a model with `--model`, or it uses your saved `web2actions model`
-choice. During analysis it may ask a few clarifying questions as numbered menus
-(like Claude Code) — use the number or just press Enter for the recommended
-option; `--assume` skips them for automation. With `-o`, analyze writes a
-**connector-definition JSON** (validated against our schema) that you can then
-`validate` and `serve` as MCP.
+See [LLM providers](#llm-providers) for how models/providers work.
 
 ### `capture` — record a site's traffic
 
-Opens a browser to the URL, records the network traffic you generate as you
-log in and click, then writes a JSON dump.
+```bash
+web2actions capture https://app.example.com -o traffic.json
+```
+Opens a browser. Log in, use the site, then press Enter in the terminal. Traffic
+is saved to `traffic.json`.
+
+### `analyze` — traffic → connector
 
 ```bash
-# Open the site; log in and click around manually; press Enter when done.
-web2actions capture https://app.example.com
-
-# Filter out analytics/static noise and save to a chosen file.
-web2actions capture https://app.example.com --filter -o dump.json
-
-# Automate a simple form login (fill + submit), then continue capturing.
-web2actions capture https://app.example.com --login \
-  --username you@example.com --password "..." \
-  --username-selector "#username" --password-selector "#password" \
-  --submit-selector "#submit-btn" --success-indicator "#dashboard"
+web2actions analyze traffic.json --url https://app.example.com -o connector.json
 ```
+The agent reads the traffic and writes a connector — one tool per page/endpoint
+you visited. Add `--assume` to skip the clarifying questions it may ask.
 
-Options: `--login`, `--username`, `--password`, `--username-selector`,
-`--password-selector`, `--submit-selector`, `--success-indicator`,
-`--filter`, `--output/-o`.
-
-### `generate` — turn captured traffic into a connector definition
+### `validate` — check a connector
 
 ```bash
-web2actions generate dump.json --model claude-sonnet-4 -o connector.json
+web2actions validate connector.json     # -> VALID
 ```
 
-Options: `--model` (or `WEB2ACTIONS_MODEL` env), `--output/-o`.
-
-### `validate` — check a connector against the schema
-
-```bash
-web2actions validate connector.json
-# -> VALID
-```
-
-### `serve` — expose a connector as an MCP server (stdio)
+### `serve` — expose a connector as MCP
 
 ```bash
 web2actions serve connector.json
 ```
-
-Wires the connector to your AI agent's MCP client over stdio.
-
-**Authenticated apps:** if the site needs a login session, pass a local auth
-file so every tool call is authenticated:
+Serves over stdio. **Authenticated apps:** pass a local auth session so tool
+calls are authenticated:
 
 ```bash
-# auth.json can be:
-#   {"token": "your-bearer-token"}
-#   {"cookies": {"sessionid": "abc", "csrf": "xyz"}}
-#   or both
+# auth.json — {"token": "..."} and/or {"cookies": {"sessionid": "abc"}}
 web2actions serve connector.json --auth auth.json
 ```
+Keep `auth.json` local with `chmod 600` — it never goes into the connector or logs.
 
-Keep the auth file local and `chmod 600` — it never goes into the connector
-definition or logs. (Re-auth on expiry is a hosted-product feature; self-hosters
-rotate the file as needed.)
-
-### End-to-end example
-
-```bash
-web2actions capture https://example.com --filter -o dump.json
-web2actions analyze dump.json --assume -o connector.json   # agent discovers API → connector
-web2actions validate connector.json
-web2actions serve connector.json
-```
-
-Works for almost any backend (a custom REST API, GraphQL, a Supabase-backed app,
-form server-actions, a backend on a different domain) — capture records all
-hosts, the agent reverse-engineers the real API, and the result is served as MCP.
-Sites behind MFA/CAPTCHA/anti-bot are refused with a clear message.
-
-### Start from an existing example (no capture needed)
+### Start without capturing (try an example)
 
 ```bash
 web2actions validate connector-spec/examples/simple-crm.json
 web2actions serve connector-spec/examples/simple-crm.json
 ```
 
-## Bringing your own LLM (BYOK)
+## LLM providers
 
-Web2Actions uses **litellm**, which connects to 100+ providers through one
-OpenAI-compatible interface. You pick a provider and a model with simple
-commands — no code changes, and the choice is remembered for future runs.
+Web2Actions uses **litellm**, which talks to 100+ providers through one
+interface. You only ever set a model once with `web2actions model`; everything
+else uses it.
 
-### Supported providers
-
-litellm supports 100+ providers, including **OpenAI, Anthropic, Google
-Gemini, OpenRouter, DeepSeek, Groq, xAI, Mistral, OpenAI-compatible local
-servers (Ollama / llama.cpp / vLLM), Bedrock, Azure, and more.**
-
-Each provider reads its standard API-key environment variable (for example
-`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
-`DEEPSEEK_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`) or, for local servers,
-needs no key at all.
-
-### Set the default model with a simple command
+Supported: **OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, Groq, xAI,
+Mistral, and local servers (Ollama / llama.cpp / vLLM)**.
 
 ```bash
-# Pick a provider + model once; it is remembered (saved to ~/.web2actions/config.toml)
+# Set any provider + model (the prefix = provider, the rest = model)
 web2actions model openai/gpt-4o-mini
 web2actions model anthropic/claude-sonnet-4
 web2actions model gemini/gemini-2.5-flash
 web2actions model openrouter/anthropic/claude-sonnet-4
 web2actions model deepseek/deepseek-chat
 
-# Show the current model
-web2actions model
-
-# Set a default provider
-web2actions model --provider openrouter
-
-# Add a short alias, then use it anywhere
-web2actions model --alias sonnet=anthropic/claude-sonnet-4
-web2actions generate dump.json --model sonnet
-
-# List your aliases
-web2actions model --aliases
+# Use a local model (no API key)
+web2actions model ollama/llama3
 ```
 
-Once set, `analyze` uses that model automatically:
+**API keys:** each cloud provider reads its standard environment variable —
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
+etc. Local servers (Ollama/llama.cpp) need no key. Export the key for the
+provider you use:
 
 ```bash
-web2actions model gemini/gemini-2.5-flash
-export GEMINI_API_KEY=...            # only needed the first time, per provider
-web2actions analyze traffic.json --assume   # uses gemini-2.5-flash
+export GEMINI_API_KEY="your-key"
 ```
 
-### Override per run
-
-Pass `--model` to use a different provider/model for a single command, or set
-the `WEB2ACTIONS_MODEL` env var. Precedence: `--model` > `WEB2ACTIONS_MODEL` >
-saved config.
-
+**Override for one command:** pass `--model` to use a different model just for
+that run:
 ```bash
-web2actions generate dump.json --model openai/gpt-4o-mini
+web2actions analyze traffic.json --model openai/gpt-4o-mini
 ```
 
-### If no key is set
+## How it works under the hood
 
-`generate` fails gracefully and tells you which key to set — it never crashes
-with a raw stack trace.
+1. **Capture** records every request the browser makes while you use the site —
+   across any domain (a site's real API may live on a separate host, e.g. a
+   Supabase backend).
+2. **Analyze** sends that traffic to your LLM, which picks out the real
+   data-loading calls and names them as tools — one per page/endpoint. It works
+   for almost any backend (REST, GraphQL, form-based, server-rendered pages).
+3. **Validate** checks the connector against our schema (names, methods, risk).
+4. **Serve** runs it as an MCP server, so an agent can call the site's tools.
+
+Works for almost any website — custom REST APIs, GraphQL, Supabase-backed apps,
+form-based apps, server-rendered pages. Sites behind MFA/CAPTCHA are refused
+with a clear message.
 
 ## Repository layout
 
-- `connector-spec/` — the connector definition schema + validator
-- `capture/` — browser session + traffic recording + noise filtering
-- `generate/` — LLM extraction (cheap path) + sandboxed fallback
+- `connector-spec/` — the connector schema + validator
+- `capture/` — browser session, traffic recorder, noise filter, auth file
+- `agent/` — the reverse-engineering harness + provider-agnostic LLM backend
+- `generate/` — (legacy) LLM extraction
 - `validate/` — live tool smoke tests + risk tagging
-- `mcp-runtime/` — the shared MCP server that serves any connector
-- `agent/` — the agent harness (vendored CLI-Anything-Web) + provider-agnostic LLM backend
-- `cli/` — the `web2actions` command-line wrapper
+- `mcp-runtime/` — the MCP server that serves any connector
+- `cli/` — the `web2actions` command
 
 ## License
 

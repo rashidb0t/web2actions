@@ -218,7 +218,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     with open(args.connector, "r", encoding="utf-8") as file:
         connector = json.load(file)
-    asyncio.run(run_stdio(connector))
+
+    auth_provider = None
+    if args.auth:
+        from auth import auth_provider_from_file
+        auth_provider = auth_provider_from_file(args.auth)
+
+    asyncio.run(run_stdio(connector, auth_provider=auth_provider))
     return 0
 
 
@@ -260,6 +266,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_serve = sub.add_parser("serve", help="Serve a connector definition as an MCP server")
     p_serve.add_argument("connector", help="Path to a connector definition (JSON)")
+    p_serve.add_argument("--auth", help="Path to an auth JSON file (token and/or cookies) to authenticate tool calls")
     p_serve.set_defaults(func=cmd_serve)
 
     # Register the agent 'analyze' subcommand (lazy import to avoid cycle).

@@ -68,13 +68,27 @@ def _execute_call(
     arguments: Dict[str, Any],
     token: Optional[str] = None,
     allowed_hosts: Optional[List[str]] = None,
+    auth: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Execute a tool's HTTP call spec and return the response as text."""
+    """Execute a tool's HTTP call spec and return the response as text.
+
+    `token` (a bearer token, legacy) and/or `auth` (a dict with 'token' and/or
+    'cookies') can be supplied to authenticate the request.
+    """
     method = call_spec.get("method", "GET").upper()
     url = call_spec["url"]
     headers = dict(call_spec.get("headers") or {})
     if token:
         headers.setdefault("Authorization", f"Bearer {token}")
+    if auth:
+        for k, v in auth.items():
+            if k == "token" and v:
+                headers.setdefault("Authorization", f"Bearer {v}")
+            elif k == "cookies" and v:
+                if isinstance(v, dict):
+                    headers.setdefault("Cookie", "; ".join(f"{ck}={cv}" for ck, cv in v.items()))
+                else:
+                    headers.setdefault("Cookie", str(v))
     body = call_spec.get("body")
 
     # Allow {param} placeholders in the URL to be filled from arguments.
@@ -94,14 +108,14 @@ def _execute_call(
 
 def build_server(
     connector: Dict[str, Any],
-    auth_provider: Optional[Callable[[], Optional[str]]] = None,
+    auth_provider: Optional[Callable[[], Optional[Any]]] = None,
 ) -> Server:
     """Build an MCP Server serving the given connector definition.
 
-    `auth_provider` is an optional zero-arg callable that returns a bearer
-    token (or None). It is invoked per tool call so credentials are fetched
-    fresh and never stored in this module. This keeps the public repo free of
-    credentials while still supporting authenticated connectors.
+    `auth_provider` is an optional zero-arg callable, invoked per tool call,
+    returning an auth dict ('token' and/or 'cookies') — or a legacy bearer
+    token string — or None. Credentials are fetched fresh and never stored in
+    this module, keeping the public repo free of secrets.
     """
     tools = {t["name"]: t for t in connector.get("tools", [])}
     allowed_hosts = _allowed_hosts(connector)
@@ -120,8 +134,10 @@ def build_server(
             )
         try:
             _validate_arguments(tool, arguments)
-            token = auth_provider() if auth_provider else None
-            result_text = _execute_call(tool.get("call", {}), arguments, token, allowed_hosts)
+            auth = auth_provider() if auth_provider else None
+            if isinstance(auth, str):  # legacy: bare bearer token
+                auth = {"token": auth}
+            result_text = _execute_call(tool.get("call", {}), arguments, allowed_hosts=allowed_hosts, auth=auth)
             return types.CallToolResult(content=[types.TextContent(type="text", text=result_text)])
         except ValueError as exc:
             # Validation/allow-list errors are safe to surface; no internals.

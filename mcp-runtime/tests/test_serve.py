@@ -152,6 +152,61 @@ class TestMCPRuntime(unittest.TestCase):
         text = _execute_call(call_spec, {}, token=token, allowed_hosts=["127.0.0.1"])
         self.assertIn("items", text)  # successful authorized call
 
+    def test_execute_call_injects_cookie_auth(self):
+        """An auth dict with cookies is sent as a Cookie header on the request."""
+        import http.server as _hs
+        import json as _json
+        import threading as _th
+
+        class H(_hs.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.end_headers()
+                out = _json.dumps({"cookie": self.headers.get("Cookie"),
+                                   "auth": self.headers.get("Authorization")}).encode()
+                self.wfile.write(out)
+            def log_message(self, *a): pass
+
+        srv = _hs.HTTPServer(("127.0.0.1", 0), H)
+        port = srv.server_address[1]
+        t = _th.Thread(target=srv.serve_forever, daemon=True); t.start()
+        try:
+            call_spec = {"method": "GET", "url": f"http://127.0.0.1:{port}/x",
+                         "headers": {}, "body": {}}
+            text = _execute_call(call_spec, {}, auth={"cookies": {"a": "1", "b": "2"}},
+                                 allowed_hosts=["127.0.0.1"])
+            self.assertIn("a=1; b=2", text)
+        finally:
+            srv.shutdown()
+
+    def test_execute_call_injects_token_auth(self):
+        """An auth dict with a token is sent as a Bearer Authorization header."""
+        import http.server as _hs
+        import json as _json
+        import threading as _th
+
+        class H(_hs.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.end_headers()
+                out = _json.dumps({"auth": self.headers.get("Authorization")}).encode()
+                self.wfile.write(out)
+            def log_message(self, *a): pass
+
+        srv = _hs.HTTPServer(("127.0.0.1", 0), H)
+        port = srv.server_address[1]
+        t = _th.Thread(target=srv.serve_forever, daemon=True); t.start()
+        try:
+            call_spec = {"method": "GET", "url": f"http://127.0.0.1:{port}/x",
+                         "headers": {}, "body": {}}
+            text = _execute_call(call_spec, {}, auth={"token": "beep"},
+                                 allowed_hosts=["127.0.0.1"])
+            self.assertIn("Bearer beep", text)
+        finally:
+            srv.shutdown()
+
     # --- client integration ---
 
     def test_client_lists_and_invokes_tool(self):

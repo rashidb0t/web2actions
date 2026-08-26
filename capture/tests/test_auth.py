@@ -21,6 +21,7 @@ from auth import (  # noqa: E402
     extract_token_from_entries,
     headers_from_auth,
     load_auth_file,
+    make_auto_reauth_provider,
     save_auth_file,
 )
 
@@ -108,6 +109,25 @@ class TestAuthFile(unittest.TestCase):
         auth = extract_session(context=MockContext(), entries=entries)
         self.assertEqual(auth["token"], "token-abc")
         self.assertEqual(auth["cookies"]["sid"], "val1")
+
+    def test_auto_reauth_provider_rotates_and_reauths(self):
+        path = self._write({"token": "old_token"})
+        reauth_called = []
+
+        def mock_login():
+            reauth_called.append(True)
+            return {"token": "refreshed_token_456"}
+
+        provider = make_auto_reauth_provider(path, login_fn=mock_login)
+        self.assertEqual(provider()["token"], "old_token")
+
+        # Trigger reauth hook
+        reauth_fn = getattr(provider, "reauth")
+        fresh = reauth_fn()
+        self.assertEqual(fresh["token"], "refreshed_token_456")
+        self.assertTrue(reauth_called)
+        # Verify provider now loads refreshed token from disk
+        self.assertEqual(provider()["token"], "refreshed_token_456")
 
 
 if __name__ == "__main__":

@@ -63,20 +63,12 @@ def _validate_arguments(tool: Dict[str, Any], arguments: Dict[str, Any]) -> None
         raise ValueError(f"Arguments failed validation: {exc.message}")
 
 
-def _execute_call(
+def _build_headers(
     call_spec: Dict[str, Any],
-    arguments: Dict[str, Any],
     token: Optional[str] = None,
-    allowed_hosts: Optional[List[str]] = None,
     auth: Optional[Dict[str, Any]] = None,
-) -> str:
-    """Execute a tool's HTTP call spec and return the response as text.
-
-    `token` (a bearer token, legacy) and/or `auth` (a dict with 'token' and/or
-    'cookies') can be supplied to authenticate the request.
-    """
-    method = call_spec.get("method", "GET").upper()
-    url = call_spec["url"]
+) -> Dict[str, str]:
+    """Assemble HTTP request headers from call_spec + auth token/cookies."""
     headers = dict(call_spec.get("headers") or {})
     if token:
         headers.setdefault("Authorization", f"Bearer {token}")
@@ -89,6 +81,28 @@ def _execute_call(
                     headers.setdefault("Cookie", "; ".join(f"{ck}={cv}" for ck, cv in v.items()))
                 else:
                     headers.setdefault("Cookie", str(v))
+    return headers
+
+
+def _execute_call(
+    call_spec: Dict[str, Any],
+    arguments: Dict[str, Any],
+    token: Optional[str] = None,
+    allowed_hosts: Optional[List[str]] = None,
+    auth: Optional[Dict[str, Any]] = None,
+    on_auth_expired: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
+) -> str:
+    """Execute a tool's HTTP call spec and return the response as text.
+
+    `token` (a bearer token, legacy) and/or `auth` (a dict with 'token' and/or
+    'cookies') can be supplied to authenticate the request.
+
+    On 401/403 (unauthorized/forbidden), if `on_auth_expired` is provided,
+    triggers a re-auth / token refresh and retries the call once before failing.
+    """
+    method = call_spec.get("method", "GET").upper()
+    url = call_spec["url"]
+    headers = _build_headers(call_spec, token=token, auth=auth)
     body = call_spec.get("body")
 
     # Allow {param} placeholders in the URL to be filled from arguments.
@@ -100,6 +114,19 @@ def _execute_call(
     response = requests.request(
         method, url, headers=headers, json=body if body is not None else None, timeout=15
     )
+
+    # Auto re-auth on 401/403 expiry if re-auth handler is configured
+    if response.status_code in (401, 403) and on_auth_expired is not None:
+        try:
+            fresh_auth = on_auth_expired()
+            if fresh_auth:
+                headers = _build_headers(call_spec, auth=fresh_auth)
+                response = requests.request(
+                    method, url, headers=headers, json=body if body is not None else None, timeout=15
+                )
+        except Exception:
+            pass
+
     text = response.text
     if len(text.encode("utf-8")) > _MAX_RESPONSE_BYTES:
         text = text[:_MAX_RESPONSE_BYTES] + "\n...[truncated]"
@@ -109,6 +136,7 @@ def _execute_call(
 def build_server(
     connector: Dict[str, Any],
     auth_provider: Optional[Callable[[], Optional[Any]]] = None,
+    on_auth_expired: Optional[Callable[[], Optional[Dict[str, Any]]]] = None,
 ) -> Server:
     """Build an MCP Server serving the given connector definition.
 
@@ -116,9 +144,17 @@ def build_server(
     returning an auth dict ('token' and/or 'cookies') — or a legacy bearer
     token string — or None. Credentials are fetched fresh and never stored in
     this module, keeping the public repo free of secrets.
+
+    `on_auth_expired` is an optional zero-arg callable triggered on 401/403
+    HTTP responses to refresh/re-login and retry the request.
     """
     tools = {t["name"]: t for t in connector.get("tools", [])}
     allowed_hosts = _allowed_hosts(connector)
+
+    # Derive on_auth_expired from auth_provider if auth_provider has a reauth attribute
+    reauth_handler = on_auth_expired
+    if reauth_handler is None and hasattr(auth_provider, "reauth"):
+        reauth_handler = getattr(auth_provider, "reauth")
 
     async def on_list_tools(_ctx, _params):
         return types.ListToolsResult(tools=[_tool_from_connector(t) for t in tools.values()])
@@ -137,7 +173,13 @@ def build_server(
             auth = auth_provider() if auth_provider else None
             if isinstance(auth, str):  # legacy: bare bearer token
                 auth = {"token": auth}
-            result_text = _execute_call(tool.get("call", {}), arguments, allowed_hosts=allowed_hosts, auth=auth)
+            result_text = _execute_call(
+                tool.get("call", {}),
+                arguments,
+                allowed_hosts=allowed_hosts,
+                auth=auth,
+                on_auth_expired=reauth_handler,
+            )
             return types.CallToolResult(content=[types.TextContent(type="text", text=result_text)])
         except ValueError as exc:
             # Validation/allow-list errors are safe to surface; no internals.

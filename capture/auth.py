@@ -43,12 +43,37 @@ def auth_provider_from_file(path: str) -> Callable[[], Dict[str, Any]]:
     Returning a callable (not the static dict) means the MCP server can re-read
     the file — useful if a self-hoster rotates the session without restarting.
     """
-    loaded = load_auth_file(path)
-
     def provider() -> Dict[str, Any]:
-        # Re-read so external rotation of the file takes effect.
-        return loaded
+        return load_auth_file(path)
 
+    def reauth() -> Dict[str, Any]:
+        # On 401/403 expiry, re-read the auth file fresh from disk
+        return load_auth_file(path)
+
+    provider.reauth = reauth  # type: ignore
+    return provider
+
+
+def make_auto_reauth_provider(
+    path: str,
+    login_fn: Optional[Callable[[], Dict[str, Any]]] = None,
+) -> Callable[[], Dict[str, Any]]:
+    """
+    Build an auth provider with an attached `reauth()` method for auto re-auth on 401/403.
+    If `login_fn` is provided, executes headless login on expiry and updates the auth file.
+    """
+    def provider() -> Dict[str, Any]:
+        return load_auth_file(path)
+
+    def reauth() -> Dict[str, Any]:
+        if login_fn is not None:
+            fresh_auth = login_fn()
+            if fresh_auth:
+                save_auth_file(path, fresh_auth)
+                return fresh_auth
+        return load_auth_file(path)
+
+    provider.reauth = reauth  # type: ignore
     return provider
 
 

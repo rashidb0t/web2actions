@@ -207,6 +207,60 @@ class TestMCPRuntime(unittest.TestCase):
         finally:
             srv.shutdown()
 
+    def test_auto_reauth_on_401_retries_and_succeeds(self):
+        """On 401/403 expiry, triggers on_auth_expired and retries with refreshed token."""
+        import http.server as _hs
+        import threading as _th
+
+        attempts = []
+
+        class _ExpiryHandler(_hs.BaseHTTPRequestHandler):
+            def do_GET(self):
+                auth_header = self.headers.get("Authorization", "")
+                attempts.append(auth_header)
+                if "fresh_token_xyz" in auth_header:
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b"OK authenticated!")
+                else:
+                    self.send_response(401)
+                    self.end_headers()
+                    self.wfile.write(b"Unauthorized: Token expired")
+
+            def log_message(self, format, *args):
+                pass
+
+        srv = _hs.HTTPServer(("127.0.0.1", 0), _ExpiryHandler)
+        port = srv.server_address[1]
+        t = _th.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+
+        try:
+            call_spec = {
+                "method": "GET",
+                "url": f"http://127.0.0.1:{port}/api/data",
+                "headers": {},
+                "body": {},
+            }
+
+            def refresh_hook():
+                return {"token": "fresh_token_xyz"}
+
+            text = _execute_call(
+                call_spec,
+                {},
+                auth={"token": "expired_token_123"},
+                allowed_hosts=["127.0.0.1"],
+                on_auth_expired=refresh_hook,
+            )
+
+            self.assertIn("OK authenticated!", text)
+            self.assertEqual(len(attempts), 2)
+            self.assertIn("expired_token_123", attempts[0])
+            self.assertIn("fresh_token_xyz", attempts[1])
+        finally:
+            srv.shutdown()
+
     # --- client integration ---
 
     def test_client_lists_and_invokes_tool(self):

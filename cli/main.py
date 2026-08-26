@@ -134,6 +134,10 @@ def cmd_capture(args: argparse.Namespace) -> int:
     page.wait_for_timeout(1500)
 
     recorder.stop()
+
+    # Extract authenticated session state (cookies and tokens) from browser context
+    from auth import extract_session, save_auth_file
+    auth_data = extract_session(context=session._context, page=page)
     session.close()
 
     entries = recorder.get_entries()
@@ -151,6 +155,20 @@ def cmd_capture(args: argparse.Namespace) -> int:
         # Keep API calls from ANY domain (backend/API/auth hosts), not just the
         # entered URL's domain. Static assets and tracking are still removed.
         entries = filter_traffic(entries)
+
+    # Supplement auth extraction with token from recorded network entries
+    if "token" not in auth_data:
+        traffic_auth = extract_session(entries=entries)
+        if "token" in traffic_auth:
+            auth_data["token"] = traffic_auth["token"]
+
+    auth_output = args.auth_output or "auth.json"
+    if auth_data and any(k in auth_data for k in ("token", "cookies")):
+        try:
+            save_auth_file(auth_output, auth_data)
+            print(f"Saved authenticated session -> {auth_output} (chmod 600)")
+        except Exception as exc:
+            print(f"warning: could not save auth file: {exc}", file=sys.stderr)
 
     output = args.output or "traffic.json"
     with open(output, "w", encoding="utf-8") as file:
@@ -250,6 +268,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_cap.add_argument("--success-indicator", help="Selector to wait for after login")
     p_cap.add_argument("--filter", action="store_true", help="Filter out noise from the captured dump")
     p_cap.add_argument("--output", "-o", help="Output traffic path (default traffic.json)")
+    p_cap.add_argument("--auth-output", help="Output path to save extracted auth session (default auth.json)")
     p_cap.add_argument("--auto-pages", type=int, default=6,
                        help="How many common pages to auto-visit after you press Enter (default 6)")
     p_cap.set_defaults(func=cmd_capture)
